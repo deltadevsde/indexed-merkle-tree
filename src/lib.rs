@@ -1,4 +1,4 @@
-mod error;
+pub mod error;
 
 use crypto_hash::{hex_digest, Algorithm};
 use num::{BigInt, Num};
