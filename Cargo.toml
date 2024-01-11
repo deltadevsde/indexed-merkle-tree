@@ -7,7 +7,7 @@ description = "This crate provides an implementation of Indexed Merkle Trees, a 
 homepage = "https://github.com/deltadevsde/indexed-merkle-tree"
 repository = "https://github.com/deltadevsde/indexed-merkle-tree"
 license = "MIT"
-keywords = ["merkle-tree", "indexed merkle-tree", "membership-proofs", "crypto", "non-membership-proofs", "zero-knowledge-proofs", "zkp", "zk"]
+keywords = ["crypto", "merkle-tree", "membership-proofs", "non-membership-proofs"]
 readme = "README.md"
 
 [dependencies]
