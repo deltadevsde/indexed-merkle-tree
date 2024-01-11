@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Ryan Ford <ryan@deltadevs.xyz>", "Sebastian Pusch <sebastian@deltadevs.xyz>"]
 description = "This crate provides an implementation of Indexed Merkle Trees, a version of Merkle trees that supports both membership and non-membership proofs."
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+homepage = "https://github.com/deltadevsde/indexed-merkle-tree"
+repository = "https://github.com/deltadevsde/indexed-merkle-tree"
+license = "MIT"
+keywords = ["merkle-tree", "indexed merkle-tree", "membership-proofs", "crypto", "non-membership-proofs", "zero-knowledge-proofs", "zkp", "zk"]
+readme = "README.md"
 
 [dependencies]
 crypto-hash = "0.3.4"
