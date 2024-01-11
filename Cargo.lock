@@ -82,7 +82,7 @@ checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "indexed-merkle-tree"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "crypto-hash",
  "num",
