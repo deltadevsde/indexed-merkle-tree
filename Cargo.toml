@@ -1,6 +1,6 @@
 [package]
 name = "indexed-merkle-tree"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Ryan Ford <ryan@deltadevs.xyz>", "Sebastian Pusch <sebastian@deltadevs.xyz>"]
 description = "This crate provides an implementation of Indexed Merkle Trees, a version of Merkle trees that supports both membership and non-membership proofs."
@@ -16,3 +16,4 @@ num = "0.4.0"
 serde = { version = "1.0.151", features = ["derive", "rc"] }
 thiserror = "1.0.50"
 serde_json = "1.0.79"
+cargo-audit = "0.20.0"
