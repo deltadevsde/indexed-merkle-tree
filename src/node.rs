@@ -1,0 +1,268 @@
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+use crate::{generate_inner_hash, generate_leaf_hash, sha256};
+
+/// Represents an inner node in the indexed Merkle Tree.
+///
+/// This structure is used for non-leaf nodes in the tree, containing references to its
+/// left and right children along with its own hash value. There is no difference between
+/// inner nodes of an indexed Merkle Tree and a classic Merkle Tree.
+///
+/// Fields:
+/// - `hash`: The hash of the current node, derived from its children.
+/// - `is_left_sibling`: Indicates whether this node is a left child of its parent.
+/// - `left`: A reference-counted pointer to the left child node.
+/// - `right`: A reference-counted pointer to the right child node.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InnerNode {
+    pub hash: String,
+    pub is_left_sibling: bool,
+    pub left: Arc<Node>,
+    pub right: Arc<Node>,
+}
+
+/// Creates a new inner node.
+///
+/// This function generates an inner node from two child nodes (left and right) and an index.
+/// The index determines the new node's left sibling status. The hash for the inner node is
+/// calculated based on its children. This is crucial for constructing the tree and updating its structure.
+///
+/// # Arguments
+/// * `left` - The left child node.
+/// * `right` - The right child node.
+/// * `index` - The position index of the new node in the tree.
+///
+/// # Returns
+/// An `InnerNode` representing the newly created inner node.
+impl InnerNode {
+    pub fn new(left: Node, right: Node, index: usize) -> Self {
+        InnerNode {
+            hash: generate_inner_hash(&left, &right),
+            is_left_sibling: index % 2 == 0,
+            left: Arc::new(left),
+            right: Arc::new(right),
+        }
+    }
+}
+
+/// Represents a leaf node in the indexed Merkle Tree.
+///
+/// Leaf nodes contain the actual data stored in the tree structure as well as metadata that,
+/// among other things, ensures the integrity and order of the tree structure.
+/// Each leaf node contains a hash of its metadata consisting of a SHA256 value,
+/// an active flag that indicates whether the leaf is active or not and links to neighboring elements for efficient traversal and verification.
+/// The links lead to the label field which is also a SHA256 value, making it sortable, which is crucial for e.g. Non-Membership proofs.
+/// For more information see https://eprint.iacr.org/2021/1263.pdf.
+///
+/// Fields:
+/// - `hash`: The hash of the values below, expect of the is_left_sibling-value.
+/// - `is_left_sibling`: Indicates if this node is a left child in its parent node.
+/// - `active`: Status flag to indicate if the node is active in the tree.
+/// - `value`: The actual data value stored in the node.
+/// - `label`: A unique identifier for the node. This is used to sort by size and to link nodes together.
+/// - `next`: A reference to the next node in the tree.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LeafNode {
+    pub hash: String,
+    pub is_left_sibling: bool,
+    pub active: bool,
+    pub value: String,
+    pub label: String,
+    pub next: String,
+}
+
+/// An enum representing the types of nodes in the indexed Merkle Tree.
+///
+/// This enum allows for the differentiation between inner and leaf nodes in the tree,
+/// facilitating operations like traversal, insertion, and proof generation.
+/// It encapsulates either an `InnerNode` or a `LeafNode`, depending on the node's position
+/// and role in the tree.
+///
+/// Variants:
+/// - `Inner(InnerNode)`: An inner node of the tree, containing references to child nodes.
+/// - `Leaf(LeafNode)`: A leaf node, containing the actual data (hash of its metadata).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Node {
+    Inner(InnerNode),
+    Leaf(LeafNode),
+}
+
+impl Node {
+    /// A placeholder for label/value values in inactive (empty) leaf nodes in the indexed Merkle Tree.
+    /// It's also the fixed label of the first element in the indexed Merkle tree, because it's the
+    /// lowest possible number in with 256 output bits from sha256.
+    pub const EMPTY_HASH: &'static str =
+        "0000000000000000000000000000000000000000000000000000000000000000";
+
+    /// This constant is used to designate the last element (because it's the highest possible number in with 256 output bits from sha256)
+    /// in the indexed Merkle tree. The next pointer from the largest label in the current tree, as well as the next pointer from inactive leaf nodes "point" to it.
+    pub const TAIL: &'static str =
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+
+    /// Returns the hash of the node.
+    ///
+    /// This function returns the hash of either an inner node or a leaf node, depending on the node type.
+    pub fn get_hash(&self) -> String {
+        match self {
+            Node::Inner(inner_node) => inner_node.hash.clone(),
+            Node::Leaf(leaf) => leaf.hash.clone(),
+        }
+    }
+
+    /// Determines if the node is a left sibling.
+    ///
+    /// This function checks whether the node (either inner or leaf) is a left sibling
+    /// in its parent node's context. This information is important in the tree's traversal
+    /// and structure maintenance, ensuring the correct positioning and integrity of the nodes.
+    pub fn is_left_sibling(&self) -> bool {
+        match self {
+            Node::Inner(inner_node) => inner_node.is_left_sibling,
+            Node::Leaf(leaf) => leaf.is_left_sibling,
+        }
+    }
+
+    /// Determines if the node is active.
+    ///
+    /// For inner nodes, this function always returns true. For leaf nodes, it checks the `active` flag.
+    /// This method is important to understand the current state of a node within the tree,
+    /// especially for insert operations to recognize the need for capacity duplication of the tree if necessary.
+    pub fn is_active(&self) -> bool {
+        match self {
+            Node::Inner(_) => true,
+            Node::Leaf(leaf) => leaf.active,
+        }
+    }
+
+    /// Sets the left sibling status of the node.
+    ///
+    /// This function updates whether the node (inner or leaf) is considered a left sibling.
+    /// This is crucial for maintaining the structural integrity of the tree, especially when nodes
+    /// are inserted or reorganized.
+    pub fn set_left_sibling_value(&mut self, is_left: bool) {
+        match self {
+            Node::Inner(inner_node) => inner_node.is_left_sibling = is_left,
+            Node::Leaf(leaf) => leaf.is_left_sibling = is_left,
+        }
+    }
+
+    /// Activates a leaf node.
+    ///
+    /// This function sets the `active` flag of a leaf node to true. It has no effect on inner nodes, because they are always active.
+    /// Activating a leaf node can be an important operation when managing the data within the indexed Merkle Tree,
+    /// especially in scenarios involving data updates or dynamic tree modifications.
+    pub fn set_node_active(&mut self) {
+        match self {
+            Node::Inner(_) => (),
+            Node::Leaf(ref mut leaf) => leaf.active = true,
+        }
+    }
+
+    /// Initializes a new leaf node with the specified properties.
+    ///
+    /// This function creates a leaf node with above defined attributes. The hash is generated based on
+    /// its active status, label, value, and next pointer. Additionally, the node is marked as a left sibling or not.
+    ///
+    /// # Arguments
+    /// * `active` - Boolean indicating if the leaf is active.
+    /// * `is_left` - Boolean indicating if this is a left sibling.
+    /// * `label` - Unique 256 bit identifier for the leaf.
+    /// * `value` - 256 Bit data value of the leaf.
+    /// * `next` - Reference to the next largest node (identified by the label value) in the sequence.
+    ///
+    /// # Returns
+    /// * A new leaf node with the specified properties.
+    pub fn initialize_leaf(
+        active: bool,
+        is_left: bool,
+        label: String,
+        value: String,
+        next: String,
+    ) -> Self {
+        let hash = format!("{}, {}, {}, {}", active, label, value, next);
+        let leaf = LeafNode {
+            hash: sha256(&hash),
+            is_left_sibling: is_left,
+            active,
+            value,
+            label,
+            next,
+        };
+        Node::Leaf(leaf)
+    }
+
+    /// Initializes an inactive leaf node.
+    ///
+    /// This function creates an inactive leaf node. The hash is always sha256(false, Node::EMPTY_HASH, Node::EMPTY_HASH, Node::TAIL).
+    /// # Arguments
+    /// * `is_left_sibling` - Boolean indicating if this is a left sibling.
+    ///
+    /// # Returns
+    /// * A new inactive leaf node.
+    pub fn initialize_inactive_leaf(is_left_sibling: bool) -> Self {
+        Node::initialize_leaf(
+            false,
+            is_left_sibling,
+            Node::EMPTY_HASH.to_string(),
+            Node::EMPTY_HASH.to_string(),
+            Node::TAIL.to_string(),
+        )
+    }
+
+    /// Attaches a node as the left child of an inner node.
+    ///
+    /// This function sets the provided node as the left child of the current inner node.
+    ///
+    /// # Arguments
+    /// * `left` - An `Arc<Self>` pointing to the node to be set as the left child.
+    pub fn add_left(&mut self, left: Arc<Self>) {
+        if let Node::Inner(inner) = self {
+            inner.left = left;
+        }
+    }
+
+    /// Attaches a node as the right child of an inner node.
+    ///
+    /// This function sets the provided node as the right child of the current inner node.
+    ///
+    /// # Arguments
+    /// * `right` - An `Arc<Self>` pointing to the node to be set as the right child.
+    pub fn add_right(&mut self, right: Arc<Self>) {
+        if let Node::Inner(inner) = self {
+            inner.right = right;
+        }
+    }
+
+    /// Updates the 'next' pointer of a leaf node.
+    ///
+    /// This function is used to update the reference to the next node in the indexed Merkle Tree.
+    ///
+    /// # Arguments
+    /// * `existing_node` - The leaf node to update.
+    /// * `new_node` - The new node whose label will be used for the 'next' pointer.
+    pub fn update_next_pointer(existing_node: &mut Self, new_node: &Self) {
+        if let Self::Leaf(ref mut existing_leaf) = existing_node {
+            if let Self::Leaf(new_leaf) = new_node {
+                existing_leaf.next = new_leaf.label.clone();
+            }
+        }
+    }
+
+    /// Generates and updates the hash for the node.
+    ///
+    /// @todo: Deprecate this function by creating proper constructors for the nodes
+    ///
+    /// This function computes the hash of a node based on its type and properties.
+    /// For an inner node, the hash is generated from the concatenated hashes of its left and right children in form of:
+    ///     SHA256(left_child_hash || right_child_hash)
+    /// For a leaf node, the hash is based on its active status, label, value, and the reference to the next node in the tree:
+    ///     SHA256(active || label || value || next)
+    pub fn generate_hash(&mut self) {
+        match self {
+            Node::Inner(node) => {
+                node.hash = generate_inner_hash(node.left.as_ref(), node.right.as_ref())
+            }
+            Node::Leaf(leaf) => leaf.hash = generate_leaf_hash(leaf),
+        }
+    }
+}
