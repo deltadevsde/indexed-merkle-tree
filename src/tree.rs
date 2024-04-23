@@ -67,10 +67,11 @@ impl IndexedMerkleTree {
         // TODO(@distractedm1nd): Issue #3
         let parsed_nodes = set_left_sibling_status_for_nodes(nodes);
 
-        let tree = Self {
+        let mut tree = Self {
             nodes: parsed_nodes,
         };
-        Ok(tree.calculate_root()?)
+        tree.calculate_root()?;
+        Ok(tree)
     }
 
     /// Creates a new `IndexedMerkleTree` of a given size
@@ -123,15 +124,16 @@ impl IndexedMerkleTree {
     /// # Returns
     ///
     /// A vector of nodes representing the next level of the Merkle tree.
-    pub fn calculate_next_level(&mut self, current_nodes: Vec<Node>) -> Vec<Node> {
+    pub fn calculate_next_level(&mut self, current_nodes: &Vec<Node>) -> Vec<Node> {
         let mut next_level_nodes: Vec<Node> = Vec::new();
 
         for (index, node) in current_nodes.chunks(2).enumerate() {
             let new_node = Node::Inner(InnerNode::new(node[0].clone(), node[1].clone(), index));
             next_level_nodes.push(new_node.clone());
-            self.nodes.push(new_node);
+            // self.nodes.push(new_node);
         }
 
+        self.nodes.extend(next_level_nodes.clone());
         next_level_nodes
     }
 
@@ -148,22 +150,23 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     ///
-    /// * `Result<IndexedMerkleTree, MerkleTreeError>` - The updated `IndexedMerkleTree` instance with the calculated root, or an error.
-    fn calculate_root(mut self) -> Result<IndexedMerkleTree, MerkleTreeError> {
+    /// * `Result<(), MerkleTreeError>` - The updated `IndexedMerkleTree` instance with the calculated root, or an error.
+    fn calculate_root(&mut self) -> Result<(), MerkleTreeError> {
         // first get all leaves (= nodes with no children)
         let leaves: Vec<Node> = self
             .nodes
-            .clone()
-            .into_iter()
-            .filter(|node| matches!(node, Node::Leaf(_)))
+            .iter()
+            .filter(|node| matches!(**node, Node::Leaf(_)))
+            .cloned()
             .collect();
+
         // "reset" own nodes
         self.nodes = leaves.clone();
 
-        let mut parents: Vec<Node> = self.calculate_next_level(leaves);
+        let mut parents: Vec<Node> = self.calculate_next_level(&leaves);
 
         while parents.len() > 1 {
-            let processed_parents: Vec<Node> = self.calculate_next_level(parents);
+            let processed_parents: Vec<Node> = self.calculate_next_level(&parents);
             parents = processed_parents;
         }
 
@@ -174,7 +177,7 @@ impl IndexedMerkleTree {
             .ok_or(MerkleTreeError::EmptyMerkleTreeError)?; // TODO: are there possible other Errors? is it possible at all to have an empty tree at this point?
         root.set_left_sibling_value(false);
 
-        Ok(self)
+        Ok(())
     }
 
     /// # Returns
@@ -190,7 +193,7 @@ impl IndexedMerkleTree {
     ///
     /// The current commitment (hash of the root node) of the Indexed Merkle tree.
     pub fn get_commitment(&self) -> Result<String, MerkleTreeError> {
-        Ok(self.get_root()?.get_hash())
+        Ok(self.get_root()?.get_hash().to_string())
     }
 
     /// Finds the index of a specific node in the indexed Merkle Tree.
@@ -377,24 +380,25 @@ impl IndexedMerkleTree {
     /// * `new_node` - The new state of the node.
     ///
     /// # Returns
-    /// A `Result<(UpdateProof, Self), MerkleTreeError>` containing the the old root, the old proof, the new root and the new proof, the updated tree.
+    /// A `Result<UpdateProof, MerkleTreeError>` containing the the old root, the old proof, the new root and the new proof.
     pub fn generate_update_proof(
-        mut self,
+        &mut self,
         index: usize,
         new_node: Node,
-    ) -> Result<(UpdateProof, Self), MerkleTreeError> {
+    ) -> Result<UpdateProof, MerkleTreeError> {
         // generate old proof
         let old_proof = self.generate_membership_proof(index)?;
 
         // update node and calculate new root
         self.nodes[index] = new_node;
-        self = self.clone().calculate_root()?;
+        self.calculate_root()?;
+        // *self = self.clone().calculate_root()?;
 
         // generate new proof
-        let new_proof = self.clone().generate_membership_proof(index)?;
+        let new_proof = self.generate_membership_proof(index)?;
 
         // return old and new proof
-        Ok(((old_proof, new_proof), self))
+        Ok((old_proof, new_proof))
     }
 
     /// Generates proofs required for inserting a node into the indexed Merkle Tree.
@@ -415,8 +419,7 @@ impl IndexedMerkleTree {
         new_node: &Node,
     ) -> Result<(MerkleProof, UpdateProof, UpdateProof), MerkleTreeError> {
         // perform non-membership check in order to return the index of the node to be changed
-        let (proof_of_non_membership, old_index) =
-            self.clone().generate_non_membership_proof(new_node)?;
+        let (proof_of_non_membership, old_index) = self.generate_non_membership_proof(new_node)?;
 
         if old_index.is_none() {
             return Err(MerkleTreeError::MerkleProofError);
@@ -429,11 +432,7 @@ impl IndexedMerkleTree {
         let mut new_old_node = self.nodes[old_index].clone();
         Node::update_next_pointer(&mut new_old_node, new_node);
         new_old_node.generate_hash();
-        let (first_update_proof, updated_self) = self
-            .clone()
-            .generate_update_proof(old_index, new_old_node.clone())?;
-
-        *self = updated_self;
+        let first_update_proof = self.generate_update_proof(old_index, new_old_node.clone())?;
 
         // we checked if the found index in the non-membership is from an incative node, if not we have to search for another inactive node to update and if we cant find one, we have to double the tree
         let mut new_index = None;
@@ -460,11 +459,7 @@ impl IndexedMerkleTree {
         };
 
         // generate second update proof
-        let (second_update_proof, updated_self) = self
-            .clone()
-            .generate_update_proof(new_index, new_node.clone())?;
-
-        *self = updated_self;
+        let second_update_proof = self.generate_update_proof(new_index, new_node.clone())?;
 
         Ok((
             proof_of_non_membership,
@@ -556,7 +551,6 @@ impl IndexedMerkleTree {
 /// # Returns
 /// A `Vec<Node>` with updated left sibling status for each node.
 pub fn set_left_sibling_status_for_nodes(nodes: Vec<Node>) -> Vec<Node> {
-    println!("Input: {}", nodes.len());
     let new: Vec<Node> = nodes
         .into_iter()
         .enumerate()
@@ -566,7 +560,6 @@ pub fn set_left_sibling_status_for_nodes(nodes: Vec<Node>) -> Vec<Node> {
             node
         })
         .collect();
-    println!("Output: {}", new.len());
     new
 }
 
