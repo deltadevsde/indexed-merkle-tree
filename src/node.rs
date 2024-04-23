@@ -22,20 +22,20 @@ pub struct InnerNode {
     pub right: Arc<Node>,
 }
 
-/// Creates a new inner node.
-///
-/// This function generates an inner node from two child nodes (left and right) and an index.
-/// The index determines the new node's left sibling status. The hash for the inner node is
-/// calculated based on its children. This is crucial for constructing the tree and updating its structure.
-///
-/// # Arguments
-/// * `left` - The left child node.
-/// * `right` - The right child node.
-/// * `index` - The position index of the new node in the tree.
-///
-/// # Returns
-/// An `InnerNode` representing the newly created inner node.
 impl InnerNode {
+    /// Creates a new inner node.
+    ///
+    /// This function generates an inner node from two child nodes (left and right) and an index.
+    /// The index determines the new node's left sibling status. The hash for the inner node is
+    /// calculated based on its children. This is crucial for constructing the tree and updating its structure.
+    ///
+    /// # Arguments
+    /// * `left` - The left child node.
+    /// * `right` - The right child node.
+    /// * `index` - The position index of the new node in the tree.
+    ///
+    /// # Returns
+    /// An `InnerNode` representing the newly created inner node.
     pub fn new(left: Node, right: Node, index: usize) -> Self {
         InnerNode {
             hash: generate_inner_hash(&left, &right),
