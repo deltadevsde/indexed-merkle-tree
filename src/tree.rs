@@ -5,15 +5,93 @@ use crate::error::MerkleTreeError;
 use crate::node::{InnerNode, Node};
 use crate::sha256;
 
-// `MerkleProof` is a tuple of the root hash and a `Vec<Node>>` following the path from the leaf to the root.
-pub type MerkleProof = (Option<String>, Option<Vec<Node>>);
+// `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MerkleProof {
+    // Root hash of the Merkle Tree.
+    pub root_hash: Option<String>,
+    // Path from the leaf to the root.
+    pub path: Option<Vec<Node>>,
+}
 
-// `UpdateProof` is a tuple of the old `MerkleProof` and the new `MerkleProof` after the update operation
-pub type UpdateProof = (MerkleProof, MerkleProof);
+// `UpdateProof` contains the old `MerkleProof` and the new `MerkleProof` after the update operation
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateProof {
+    // Merkle proof before the update.
+    pub old_proof: MerkleProof,
+    // Merkle proof after the update.
+    pub new_proof: MerkleProof,
+}
 
-// `InsertProof` is a tuple of the non-membership proof of the new `Node` (to guarantee uniqueness), and two `UpdateProof`s.
-// The first `UpdateProof` is of the previous `Node`'s next pointer, sorted by label. The second `UpdateProof` is of the new `Node`.
-pub type InsertProof = (MerkleProof, UpdateProof, UpdateProof);
+// `InsertProof` contains the non-membership proof of the new `Node` (to guarantee uniqueness), and two `UpdateProof`s.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InsertProof {
+    // Non-membership proof of the new node.
+    pub non_membership_proof: MerkleProof,
+    // Update proof of the previous node's next pointer.
+    pub first_proof: UpdateProof,
+    // Update proof of the new node.
+    pub second_proof: UpdateProof,
+}
+
+impl InsertProof {
+    /// Verifies the proofs associated with a node insertion in the indexed Merkle Tree.
+    ///
+    /// This function confirms the non-membership of the node before insertion, and then verifies
+    /// the two update proofs representing the tree's state changes due to the insertion. Essential for
+    /// validating insert operations in the tree.
+    ///
+    /// # Returns
+    /// `true` if all proofs are valid, `false` otherwise.
+    pub fn verify(&self) -> bool {
+        self.non_membership_proof.verify()
+            && self.first_proof.verify()
+            && self.second_proof.verify()
+    }
+}
+
+impl UpdateProof {
+    /// Verifies an update proof in the indexed Merkle Tree.
+    ///
+    /// This function checks both the old and new "state" proofs of a node to ensure that the update
+    /// operation has been performed correctly and the tree's integrity is maintained.
+    ///
+    /// # Returns
+    /// `true` if both proofs are valid, `false` otherwise.
+    pub fn verify(&self) -> bool {
+        self.old_proof.verify() && self.new_proof.verify()
+    }
+}
+
+impl MerkleProof {
+    /// Verifies a Merkle proof against a given root hash.
+    ///
+    /// This function takes a Merkle proof and verifies that the hashes in the proof's path, when
+    /// combined in the correct order, match the given root hash. It's critical for ensuring the integrity
+    /// and correctness of proofs in the (indexed) Merkle Tree.
+    ///
+    /// # Returns
+    /// `true` if the proof is valid and matches the root hash, `false` otherwise.
+    pub fn verify(&self) -> bool {
+        match (&self.root_hash, &self.path) {
+            (Some(root), Some(path)) if !path.is_empty() => {
+                // save the first now as current hash and skip it in the loop to start with the second
+                let mut current_hash = path[0].get_hash();
+
+                for node in path.iter().skip(1) {
+                    let hash = if node.is_left_sibling() {
+                        format!("{} || {}", node.get_hash(), current_hash)
+                    } else {
+                        format!("{} || {}", current_hash, node.get_hash())
+                    };
+                    current_hash = sha256(&hash);
+                }
+                return &current_hash == root;
+            }
+            _ => false,
+        }
+    }
+}
 
 /// Represents different Proof variants of an `IndexedMerkleTree`.
 ///
@@ -21,26 +99,9 @@ pub type InsertProof = (MerkleProof, UpdateProof, UpdateProof);
 /// - `Update(UpdateProof)`: Represents a proof for an update operation.
 /// - `Insert(InsertProof)`: Represents a proof for an insert operation.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum ProofVariant {
+pub enum Proof {
     Update(UpdateProof),
     Insert(InsertProof),
-}
-
-/// Represents a (classic) cryptographic merkle proof, which is not specific to indexed merkle trees.
-///
-/// This structure encapsulates the path and root hashes before and after the modification which
-/// are necessary to verify tree changes.
-///
-/// Fields:
-/// - `old_root`: The root hash of the tree before the modification.
-/// - `old_path`: The path in the tree before the modification.
-/// - `new_root`: The root hash of the tree after the modification.
-/// - `new_path`: The path in the tree after the modification.
-pub struct Proof {
-    pub old_root: String,
-    pub old_path: Vec<Node>,
-    pub new_root: String,
-    pub new_path: Vec<Node>,
 }
 
 /// Represents an indexed merkle tree.
@@ -124,13 +185,12 @@ impl IndexedMerkleTree {
     /// # Returns
     ///
     /// A vector of nodes representing the next level of the Merkle tree.
-    pub fn calculate_next_level(&mut self, current_nodes: &Vec<Node>) -> Vec<Node> {
+    fn calculate_next_level(&mut self, current_nodes: &Vec<Node>) -> Vec<Node> {
         let mut next_level_nodes: Vec<Node> = Vec::new();
 
         for (index, node) in current_nodes.chunks(2).enumerate() {
             let new_node = Node::Inner(InnerNode::new(node[0].clone(), node[1].clone(), index));
             next_level_nodes.push(new_node.clone());
-            // self.nodes.push(new_node);
         }
 
         self.nodes.extend(next_level_nodes.clone());
@@ -317,7 +377,10 @@ impl IndexedMerkleTree {
         }
         let root = self.get_commitment()?;
 
-        Ok((Some(root.clone()), Some(proof_path)))
+        Ok(MerkleProof {
+            root_hash: Some(root.clone()),
+            path: Some(proof_path),
+        })
     }
 
     /// Generates a non-membership proof for a given node in the indexed merkle tree.
@@ -397,7 +460,10 @@ impl IndexedMerkleTree {
         let new_proof = self.generate_membership_proof(index)?;
 
         // return old and new proof
-        Ok((old_proof, new_proof))
+        Ok(UpdateProof {
+            old_proof,
+            new_proof,
+        })
     }
 
     /// Inserts a node into the merkle tree, returning the insertion proof.
@@ -413,12 +479,9 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     /// A `Result<(MerkleProof, UpdateProof, UpdateProof), MerkleTreeError>` containing the non-membership proof and two update proofs.
-    pub fn insert_node(
-        &mut self,
-        new_node: &Node,
-    ) -> Result<(MerkleProof, UpdateProof, UpdateProof), MerkleTreeError> {
+    pub fn insert_node(&mut self, new_node: &Node) -> Result<InsertProof, MerkleTreeError> {
         // perform non-membership check in order to return the index of the node to be changed
-        let (proof_of_non_membership, old_index) = self.generate_non_membership_proof(new_node)?;
+        let (non_membership_proof, old_index) = self.generate_non_membership_proof(new_node)?;
 
         if old_index.is_none() {
             return Err(MerkleTreeError::MerkleProofError);
@@ -431,7 +494,7 @@ impl IndexedMerkleTree {
         let mut new_old_node = self.nodes[old_index].clone();
         Node::update_next_pointer(&mut new_old_node, new_node);
         new_old_node.generate_hash();
-        let first_update_proof = self.update_node(old_index, new_old_node.clone())?;
+        let first_proof = self.update_node(old_index, new_old_node.clone())?;
 
         // we checked if the found index in the non-membership is from an incative node, if not we have to search for another inactive node to update and if we cant find one, we have to double the tree
         let mut new_index = None;
@@ -458,81 +521,13 @@ impl IndexedMerkleTree {
         };
 
         // generate second update proof
-        let second_update_proof = self.update_node(new_index, new_node.clone())?;
+        let second_proof = self.update_node(new_index, new_node.clone())?;
 
-        Ok((
-            proof_of_non_membership,
-            first_update_proof,
-            second_update_proof,
-        ))
-    }
-
-    /// Verifies a Merkle proof against a given root hash.
-    ///
-    /// This function takes a Merkle proof and verifies that the hashes in the proof's path, when
-    /// combined in the correct order, match the given root hash. It's critical for ensuring the integrity
-    /// and correctness of proofs in the (indexed) Merkle Tree.
-    ///
-    /// # Arguments
-    /// * `proof` - A reference to the `MerkleProof` to be verified.
-    ///
-    /// # Returns
-    /// `true` if the proof is valid and matches the root hash, `false` otherwise.
-    fn verify_merkle_proof(proof: &MerkleProof) -> bool {
-        match proof {
-            (Some(root), Some(path)) => {
-                // save the first now as current hash and skip it in the loop to start with the second
-                let mut current_hash = path[0].get_hash();
-
-                for node in path.iter().skip(1) {
-                    let hash = if node.is_left_sibling() {
-                        format!("{} || {}", node.get_hash(), current_hash)
-                    } else {
-                        format!("{} || {}", current_hash, node.get_hash())
-                    };
-                    current_hash = sha256(&hash);
-                }
-                return &current_hash == root;
-            }
-            _ => false,
-        }
-    }
-
-    /// Verifies an update proof in the indexed Merkle Tree.
-    ///
-    /// This function checks both the old and new "state" proofs of a node to ensure that the update
-    /// operation has been performed correctly and the tree's integrity is maintained.
-    ///
-    /// # Arguments
-    /// * `old_proof` - The proof of the node's state before the update.
-    /// * `new_proof` - The proof of the node's state after the update.
-    ///
-    /// # Returns
-    /// `true` if both proofs are valid, `false` otherwise.
-    pub fn verify_update_proof((old_proof, new_proof): &UpdateProof) -> bool {
-        IndexedMerkleTree::verify_merkle_proof(old_proof)
-            && IndexedMerkleTree::verify_merkle_proof(new_proof)
-    }
-
-    /// Verifies the proofs associated with a node insertion in the indexed Merkle Tree.
-    ///
-    /// This function confirms the non-membership of the node before insertion, and then verifies
-    /// the two update proofs representing the tree's state changes due to the insertion. Essential for
-    /// validating insert operations in the tree.
-    ///
-    /// # Arguments
-    /// * `non_membership_proof` - The proof of the node's non-membership before insertion.
-    /// * `first_proof` - The first update proof (pointer update of existing ("closest") node).
-    /// * `second_proof` - The second update proof (update of empty inactive node with new values).
-    ///
-    /// # Returns
-    /// `true` if all proofs are valid, `false` otherwise.
-    pub fn verify_insert_proof(
-        (non_membership_proof, first_proof, second_proof): &InsertProof,
-    ) -> bool {
-        IndexedMerkleTree::verify_merkle_proof(non_membership_proof)
-            && IndexedMerkleTree::verify_update_proof(first_proof)
-            && IndexedMerkleTree::verify_update_proof(second_proof)
+        Ok(InsertProof {
+            non_membership_proof,
+            first_proof,
+            second_proof,
+        })
     }
 }
 
