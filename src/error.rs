@@ -13,5 +13,5 @@ pub enum MerkleTreeError {
     #[error("Invalid format error: {0}")]
     InvalidFormatError(String),
     #[error("Failed to generate Merkle proof")]
-    MerkleProofError
+    MerkleProofError,
 }
