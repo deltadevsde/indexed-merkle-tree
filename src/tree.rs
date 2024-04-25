@@ -175,26 +175,28 @@ impl IndexedMerkleTree {
         IndexedMerkleTree::new(nodes)
     }
 
-    /// Calculates the next level of the Merkle tree by aggregating the hash values of the
-    /// current level nodes in pairs, creating new inner nodes and adding them to the indexed merkle tree nodes.
+    /// Recursively creates the inner nodes to the root of the indexed merkle tree from the passed nodes.
     ///
-    /// # Arguments
-    ///
-    /// * `current_nodes` - A vector of nodes representing the current level of the tree.
-    ///
-    /// # Returns
-    ///
-    /// A vector of nodes representing the next level of the Merkle tree.
-    fn calculate_next_level(&mut self, current_nodes: &Vec<Node>) -> Vec<Node> {
-        let mut next_level_nodes: Vec<Node> = Vec::new();
-
-        for (index, node) in current_nodes.chunks(2).enumerate() {
+    /// When called, this function expects the passed nodes to be leaf nodes.
+    /// It assumes these are the only nodes present in `self.nodes`.
+    fn rehash_inner_nodes(&mut self, current_layer: &Vec<Node>) {
+        for (index, node) in current_layer.chunks(2).enumerate() {
             let new_node = Node::Inner(InnerNode::new(node[0].clone(), node[1].clone(), index));
-            next_level_nodes.push(new_node.clone());
+            self.nodes.push(new_node);
         }
 
-        self.nodes.extend(next_level_nodes.clone());
-        next_level_nodes
+        let remaining = current_layer.len() / 2;
+        if remaining > 1 {
+            self.rehash_inner_nodes(&self.nodes[self.nodes.len() - remaining..].to_vec());
+        }
+    }
+
+    /// Rehashes the inner nodes of the indexed merkle tree from the existing leaf nodes.
+    ///
+    /// This is done when first initializing the tree, as well as when nodes are updated.
+    fn rebuild_tree_from_leaves(&mut self) {
+        self.nodes.retain(|node| matches!(node, Node::Leaf(_)));
+        self.rehash_inner_nodes(&self.nodes.clone());
     }
 
     /// Calculates the root of an IndexedMerkleTree by aggregating the tree's nodes.
@@ -210,25 +212,9 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     ///
-    /// * `Result<(), MerkleTreeError>` - The updated `IndexedMerkleTree` instance with the calculated root, or an error.
+    /// * `Result<(), MerkleTreeError>` - A result indicating the success or failure of the operation.
     fn calculate_root(&mut self) -> Result<(), MerkleTreeError> {
-        // first get all leaves (= nodes with no children)
-        let leaves: Vec<Node> = self
-            .nodes
-            .iter()
-            .filter(|node| matches!(**node, Node::Leaf(_)))
-            .cloned()
-            .collect();
-
-        // "reset" own nodes
-        self.nodes = leaves.clone();
-
-        let mut parents: Vec<Node> = self.calculate_next_level(&leaves);
-
-        while parents.len() > 1 {
-            let processed_parents: Vec<Node> = self.calculate_next_level(&parents);
-            parents = processed_parents;
-        }
+        self.rebuild_tree_from_leaves();
 
         // set root not as left sibling
         let root = self
@@ -498,7 +484,7 @@ impl IndexedMerkleTree {
 
         // we checked if the found index in the non-membership is from an incative node, if not we have to search for another inactive node to update and if we cant find one, we have to double the tree
         let mut new_index = None;
-        for (i, node) in self.nodes.iter_mut().enumerate() {
+        for (i, node) in self.nodes.iter().enumerate() {
             if !node.is_active() {
                 new_index = Some(i);
                 break;
