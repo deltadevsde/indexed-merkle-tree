@@ -72,6 +72,47 @@ pub struct LeafNode {
     pub next: String,
 }
 
+impl LeafNode {
+    /// Initializes a new leaf node with the specified properties.
+    ///
+    /// This function creates a leaf node with above defined attributes. The hash is generated based on
+    /// its active status, label, value, and next pointer. Additionally, the node is marked as a left sibling or not.
+    ///
+    /// # Arguments
+    /// * `active` - Boolean indicating if the leaf is active.
+    /// * `is_left` - Boolean indicating if this is a left sibling.
+    /// * `label` - Unique 256 bit identifier for the leaf.
+    /// * `value` - 256 Bit data value of the leaf.
+    /// * `next` - Reference to the next largest node (identified by the label value) in the sequence.
+    ///
+    /// # Returns
+    /// * A new leaf node with the specified properties.
+    pub fn new(active: bool, is_left: bool, label: String, value: String, next: String) -> Self {
+        let hash = format!("{}, {}, {}, {}", active, label, value, next);
+        LeafNode {
+            hash: sha256(&hash),
+            is_left_sibling: is_left,
+            active,
+            value,
+            label,
+            next,
+        }
+    }
+}
+
+impl Default for LeafNode {
+    fn default() -> Self {
+        LeafNode::new(
+            false,
+            // default leaf nodes are not left siblings
+            false,
+            Node::EMPTY_HASH.to_string(),
+            Node::EMPTY_HASH.to_string(),
+            Node::TAIL.to_string(),
+        )
+    }
+}
+
 /// An enum representing the types of nodes in the indexed Merkle Tree.
 ///
 /// This enum allows for the differentiation between inner and leaf nodes in the tree,
@@ -86,6 +127,12 @@ pub struct LeafNode {
 pub enum Node {
     Inner(InnerNode),
     Leaf(LeafNode),
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Node::Leaf(LeafNode::default())
+    }
 }
 
 impl Node {
@@ -156,57 +203,6 @@ impl Node {
             Node::Inner(_) => (),
             Node::Leaf(ref mut leaf) => leaf.active = true,
         }
-    }
-
-    /// Initializes a new leaf node with the specified properties.
-    ///
-    /// This function creates a leaf node with above defined attributes. The hash is generated based on
-    /// its active status, label, value, and next pointer. Additionally, the node is marked as a left sibling or not.
-    ///
-    /// # Arguments
-    /// * `active` - Boolean indicating if the leaf is active.
-    /// * `is_left` - Boolean indicating if this is a left sibling.
-    /// * `label` - Unique 256 bit identifier for the leaf.
-    /// * `value` - 256 Bit data value of the leaf.
-    /// * `next` - Reference to the next largest node (identified by the label value) in the sequence.
-    ///
-    /// # Returns
-    /// * A new leaf node with the specified properties.
-    pub fn initialize_leaf(
-        active: bool,
-        is_left: bool,
-        label: String,
-        value: String,
-        next: String,
-    ) -> Self {
-        let hash = format!("{}, {}, {}, {}", active, label, value, next);
-        let leaf = LeafNode {
-            hash: sha256(&hash),
-            is_left_sibling: is_left,
-            active,
-            value,
-            label,
-            next,
-        };
-        Node::Leaf(leaf)
-    }
-
-    /// Initializes an inactive leaf node.
-    ///
-    /// This function creates an inactive leaf node. The hash is always sha256(false, Node::EMPTY_HASH, Node::EMPTY_HASH, Node::TAIL).
-    /// # Arguments
-    /// * `is_left_sibling` - Boolean indicating if this is a left sibling.
-    ///
-    /// # Returns
-    /// * A new inactive leaf node.
-    pub fn initialize_inactive_leaf(is_left_sibling: bool) -> Self {
-        Node::initialize_leaf(
-            false,
-            is_left_sibling,
-            Node::EMPTY_HASH.to_string(),
-            Node::EMPTY_HASH.to_string(),
-            Node::TAIL.to_string(),
-        )
     }
 
     /// Attaches a node as the left child of an inner node.

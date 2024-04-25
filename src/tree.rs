@@ -2,7 +2,7 @@ use num::{BigInt, Num};
 use serde::{Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
-use crate::node::{InnerNode, Node};
+use crate::node::{InnerNode, LeafNode, Node};
 use crate::sha256;
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
@@ -143,28 +143,33 @@ impl IndexedMerkleTree {
     /// # Returns
     /// A `Result<Self, MerkleTreeError>` representing the initialized tree or an error.
     pub fn new_with_size(size: usize) -> Result<Self, MerkleTreeError> {
-        let mut nodes: Vec<Node> = Vec::with_capacity(size);
+        let mut nodes: Vec<Node> = Vec::with_capacity(2 * size + 1);
         let empty_hash = Node::EMPTY_HASH.to_string();
         let tail = Node::TAIL.to_string();
 
-        let active_node = Node::initialize_leaf(
+        let active_node = Node::Leaf(LeafNode::new(
             true,
             true,
             empty_hash.clone(),
             empty_hash.clone(),
             tail.clone(),
-        );
+        ));
         nodes.push(active_node);
 
-        let left_inactive_node = Node::initialize_leaf(
+        let left_inactive_node = Node::Leaf(LeafNode::new(
             false,
             true,
             empty_hash.clone(),
             empty_hash.clone(),
             tail.clone(),
-        );
-        let right_inactive_node =
-            Node::initialize_leaf(false, false, empty_hash.clone(), empty_hash, tail);
+        ));
+        let right_inactive_node = Node::Leaf(LeafNode::new(
+            false,
+            false,
+            empty_hash.clone(),
+            empty_hash,
+            tail,
+        ));
 
         let alternates = vec![left_inactive_node, right_inactive_node]
             .into_iter()
@@ -214,6 +219,7 @@ impl IndexedMerkleTree {
     ///
     /// * `Result<(), MerkleTreeError>` - A result indicating the success or failure of the operation.
     fn calculate_root(&mut self) -> Result<(), MerkleTreeError> {
+        // self.rebuild_tree_from_leaves();
         self.rebuild_tree_from_leaves();
 
         // set root not as left sibling
@@ -308,16 +314,7 @@ impl IndexedMerkleTree {
     /// default values.
     pub fn double_tree_size(&mut self) {
         let current_size = self.nodes.len();
-        for _ in 0..current_size {
-            let new_node = Node::initialize_leaf(
-                false, // inactive
-                false, // is_left_sibling will be set later
-                Node::EMPTY_HASH.to_string(),
-                Node::EMPTY_HASH.to_string(),
-                Node::TAIL.to_string(),
-            );
-            self.nodes.push(new_node);
-        }
+        self.nodes.resize(current_size * 2 + 1, Node::default());
         // update sibling status
         let new_nodes = set_left_sibling_status_for_nodes(self.nodes.clone());
         self.nodes = new_nodes;
