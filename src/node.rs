@@ -147,6 +147,24 @@ impl Node {
     pub const TAIL: &'static str =
         "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
 
+    /// Convenience method for creating a new leaf node.
+    /// See `LeafNode::new` for more information.
+    pub fn new_leaf(
+        active: bool,
+        is_left: bool,
+        label: String,
+        value: String,
+        next: String,
+    ) -> Self {
+        return Node::Leaf(LeafNode::new(active, is_left, label, value, next));
+    }
+
+    /// Convenience method for creating a new inner node.
+    /// See `InnerNode::new` for more information.
+    pub fn new_inner(left: Node, right: Node, index: usize) -> Self {
+        return Node::Inner(InnerNode::new(left, right, index));
+    }
+
     /// Returns the hash of the node.
     ///
     /// This function returns the hash of either an inner node or a leaf node, depending on the node type.

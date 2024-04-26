@@ -147,7 +147,7 @@ impl IndexedMerkleTree {
         let empty_hash = Node::EMPTY_HASH.to_string();
         let tail = Node::TAIL.to_string();
 
-        let active_node = Node::Leaf(LeafNode::new(
+        let active_node = Node::new_leaf(
             true,
             true,
             empty_hash.clone(),
@@ -156,14 +156,14 @@ impl IndexedMerkleTree {
         ));
         nodes.push(active_node);
 
-        let left_inactive_node = Node::Leaf(LeafNode::new(
+        let left_inactive_node = Node::new_leaf(
             false,
             true,
             empty_hash.clone(),
             empty_hash.clone(),
             tail.clone(),
         ));
-        let right_inactive_node = Node::Leaf(LeafNode::new(
+        let right_inactive_node = Node::new_leaf(
             false,
             false,
             empty_hash.clone(),
