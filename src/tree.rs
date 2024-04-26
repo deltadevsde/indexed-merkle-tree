@@ -153,7 +153,7 @@ impl IndexedMerkleTree {
             empty_hash.clone(),
             empty_hash.clone(),
             tail.clone(),
-        ));
+        );
         nodes.push(active_node);
 
         let left_inactive_node = Node::new_leaf(
@@ -162,14 +162,9 @@ impl IndexedMerkleTree {
             empty_hash.clone(),
             empty_hash.clone(),
             tail.clone(),
-        ));
-        let right_inactive_node = Node::new_leaf(
-            false,
-            false,
-            empty_hash.clone(),
-            empty_hash,
-            tail,
-        ));
+        );
+        let right_inactive_node =
+            Node::new_leaf(false, false, empty_hash.clone(), empty_hash, tail);
 
         let alternates = vec![left_inactive_node, right_inactive_node]
             .into_iter()
