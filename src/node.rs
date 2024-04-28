@@ -284,3 +284,120 @@ impl Node {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_leaf_node_creation() {
+        let active = true;
+        let is_left = false;
+        let label = "test_label".to_string();
+        let value = "test_value".to_string();
+        let next = "test_next".to_string();
+        let leaf = LeafNode::new(active, is_left, label.clone(), value.clone(), next.clone());
+
+        assert_eq!(leaf.active, active);
+        assert_eq!(leaf.is_left_sibling, is_left);
+        assert_eq!(leaf.label, label);
+        assert_eq!(leaf.value, value);
+        assert_eq!(leaf.next, next);
+        assert!(!leaf.hash.is_empty());
+    }
+
+    #[test]
+    fn test_inner_node_creation() {
+        let left_node = Node::default();
+        let right_node = Node::default();
+        let index = 0;
+        let inner_node = InnerNode::new(left_node.clone(), right_node.clone(), index);
+
+        let left_pointer = Arc::try_unwrap(inner_node.left).unwrap();
+        let right_pointer = Arc::try_unwrap(inner_node.right).unwrap();
+        assert_eq!(left_pointer.get_hash(), left_node.get_hash());
+        assert_eq!(right_pointer.get_hash(), right_pointer.get_hash());
+        assert_eq!(inner_node.is_left_sibling, true); // index 0 makes it left
+        assert!(!inner_node.hash.is_empty());
+    }
+
+    #[test]
+    fn test_node_default() {
+        let node = Node::default();
+        match node {
+            Node::Leaf(leaf) => {
+                assert_eq!(leaf.active, false);
+                assert_eq!(leaf.is_left_sibling, false);
+                assert_eq!(leaf.label, Node::EMPTY_HASH);
+                assert_eq!(leaf.value, Node::EMPTY_HASH);
+                assert_eq!(leaf.next, Node::TAIL);
+            }
+            _ => panic!("Default node is not a LeafNode"),
+        }
+    }
+
+    #[test]
+    fn test_node_is_active() {
+        let leaf_node = Node::new_leaf(
+            true,
+            false,
+            "label".to_string(),
+            "value".to_string(),
+            "next".to_string(),
+        );
+        assert!(leaf_node.is_active());
+
+        let inner_node = Node::new_inner(Node::default(), Node::default(), 1);
+        assert!(inner_node.is_active());
+    }
+
+    #[test]
+    fn test_node_set_left_sibling() {
+        let mut node = Node::default();
+        assert_eq!(node.is_left_sibling(), false);
+
+        node.set_left_sibling_value(true);
+        assert_eq!(node.is_left_sibling(), true);
+    }
+
+    #[test]
+    fn test_leaf_node_activation() {
+        let mut node = Node::default();
+        if let Node::Leaf(ref leaf) = node {
+            assert_eq!(leaf.active, false);
+        }
+
+        node.set_node_active();
+        if let Node::Leaf(leaf) = node {
+            assert!(leaf.active);
+        } else {
+            panic!("Node is not a LeafNode");
+        }
+    }
+
+    #[test]
+    fn test_update_next_pointer() {
+        let mut existing_node = Node::new_leaf(
+            false,
+            false,
+            "label1".to_string(),
+            "value1".to_string(),
+            "next1".to_string(),
+        );
+        let new_node = Node::new_leaf(
+            true,
+            true,
+            "label2".to_string(),
+            "value2".to_string(),
+            "next2".to_string(),
+        );
+
+        Node::update_next_pointer(&mut existing_node, &new_node);
+        if let Node::Leaf(leaf) = existing_node {
+            assert_eq!(leaf.next, "label2");
+        } else {
+            panic!("Existing node is not a LeafNode");
+        }
+    }
+}
