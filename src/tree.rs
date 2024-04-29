@@ -14,11 +14,14 @@ pub struct MerkleProof {
     pub path: Vec<Node>,
 }
 
+// `NonMembershipProof` contains the `MerkleProof` of the node where the returned `missing_node: LeafNode` would be found.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NonMembershipProof {
-    // Root hash of the Merkle Tree.
+    // Merkle proof of the node that `missing_node` would be found between `label` and `next`.
     pub merkle_proof: MerkleProof,
-    // Path from the leaf to the root.
+    // Index of the node that `missing_node` would be found between `label` and `next`.
+    pub closest_index: usize,
+    // Node that would be found in the place of the node proved in `merkle_proof`.
     pub missing_node: LeafNode,
 }
 
@@ -109,9 +112,9 @@ impl MerkleProof {
 
                 for node in path.iter().skip(1) {
                     let hash = if node.is_left_sibling() {
-                        format!("{} || {}", node.get_hash(), current_hash)
+                        format!("{}{}", node.get_hash(), current_hash)
                     } else {
-                        format!("{} || {}", current_hash, node.get_hash())
+                        format!("{}{}", current_hash, node.get_hash())
                     };
                     current_hash = sha256(&hash);
                 }
@@ -224,9 +227,7 @@ impl IndexedMerkleTree {
     ///
     /// This is done when first initializing the tree, as well as when nodes are updated.
     fn rebuild_tree_from_leaves(&mut self) {
-        let leafcount = (self.nodes.len() + 1) / 2;
-        // Will always be truncated so the default value doesnt matter
-        self.nodes.resize(leafcount, Node::default());
+        self.nodes.retain(|node| matches!(node, Node::Leaf(_)))
         self.rehash_inner_nodes(&self.nodes.clone());
     }
 
@@ -438,6 +439,7 @@ impl IndexedMerkleTree {
         match found_index {
             Some(index) => Ok(NonMembershipProof {
                 merkle_proof: self.generate_membership_proof(found_index.unwrap())?,
+                closest_index: found_index.unwrap(),
                 missing_node: given_node_as_leaf.clone(),
             }),
             None => Err(MerkleTreeError::MerkleProofError),
@@ -499,15 +501,11 @@ impl IndexedMerkleTree {
             return Err(MerkleTreeError::MerkleProofError);
         }
 
-        let old_index = self
-            .find_node_index(non_membership_proof.merkle_proof.path.first().unwrap())
-            .ok_or(MerkleTreeError::MerkleProofError)?;
-
         // generate first update proof, changing only the next pointer from the old node
-        let mut new_old_node = self.nodes[old_index].clone();
+        let mut new_old_node = self.nodes[non_membership_proof.closest_index].clone();
         Node::update_next_pointer(&mut new_old_node, new_node);
         new_old_node.generate_hash();
-        let first_proof = self.update_node(old_index, new_old_node.clone())?;
+        let first_proof = self.update_node(non_membership_proof.closest_index, new_old_node.clone())?;
 
         // we checked if the found index in the non-membership is from an incative node, if not we have to search for another inactive node to update and if we cant find one, we have to double the tree
         let mut new_index = None;
