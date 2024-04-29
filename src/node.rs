@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::{generate_inner_hash, generate_leaf_hash, sha256};
+use crate::sha256;
 
 /// Represents an inner node in the indexed Merkle Tree.
 ///
@@ -38,7 +38,7 @@ impl InnerNode {
     /// An `InnerNode` representing the newly created inner node.
     pub fn new(left: Node, right: Node, index: usize) -> Self {
         InnerNode {
-            hash: generate_inner_hash(&left, &right),
+            hash: sha256(&format!("{}{}", left.get_hash(), right.get_hash())),
             is_left_sibling: index % 2 == 0,
             left: Arc::new(left),
             right: Arc::new(right),
@@ -274,9 +274,13 @@ impl Node {
     pub fn generate_hash(&mut self) {
         match self {
             Node::Inner(node) => {
-                node.hash = generate_inner_hash(node.left.as_ref(), node.right.as_ref())
+                let hash = format!("{}{}", node.left.get_hash(), node.right.get_hash());
+                node.hash = sha256(&hash);
             }
-            Node::Leaf(leaf) => leaf.hash = generate_leaf_hash(leaf),
+            Node::Leaf(leaf) => {
+                let hash = format!("{}{}{}{}", leaf.active, leaf.label, leaf.value, leaf.next);
+                leaf.hash = sha256(&hash);
+            }
         }
     }
 }
