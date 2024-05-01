@@ -1,17 +1,18 @@
+use num::bigint::Sign;
 use num::{BigInt, Num};
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
-use crate::node::{self, InnerNode, LeafNode, Node};
-use crate::sha256;
+use crate::node::{self, InnerNode, LeafNode, Node, ZkNode};
+use crate::{concat_arrays, sha256};
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MerkleProof {
     // Root hash of the Merkle Tree.
-    pub root_hash: String,
+    pub root_hash: [u8; 32],
     // Path from the leaf to the root.
-    pub path: Vec<Node>,
+    pub path: Vec<ZkNode>,
 }
 
 // `NonMembershipProof` contains the `MerkleProof` of the node where the returned `missing_node: LeafNode` would be found.
@@ -54,7 +55,7 @@ impl NonMembershipProof {
     /// # Returns
     /// `true` if the proof is valid and the node is not present, `false` otherwise.
     pub fn verify(&self) -> bool {
-        if let Some(Node::Leaf(leaf)) = self.merkle_proof.path.first() {
+        if let Some(ZkNode::Leaf(leaf)) = self.merkle_proof.path.first() {
             if self.merkle_proof.verify()
                 && self.missing_node.label < leaf.label
                 && self.missing_node.label < leaf.next
@@ -112,9 +113,9 @@ impl MerkleProof {
 
                 for node in path.iter().skip(1) {
                     let hash = if node.is_left_sibling() {
-                        format!("{}{}", node.get_hash(), current_hash)
+                        concat_arrays(node.get_hash(), current_hash)
                     } else {
-                        format!("{}{}", current_hash, node.get_hash())
+                        concat_arrays(current_hash, node.get_hash())
                     };
                     current_hash = sha256(&hash);
                 }
@@ -176,8 +177,8 @@ impl IndexedMerkleTree {
     /// A `Result<Self, MerkleTreeError>` representing the initialized tree or an error.
     pub fn new_with_size(size: usize) -> Result<Self, MerkleTreeError> {
         let mut nodes: Vec<Node> = Vec::with_capacity(2 * size + 1);
-        let empty_hash = Node::EMPTY_HASH.to_string();
-        let tail = Node::TAIL.to_string();
+        let empty_hash = Node::EMPTY_HASH;
+        let tail = Node::TAIL;
 
         let active_node = Node::new_leaf(
             true,
@@ -271,8 +272,8 @@ impl IndexedMerkleTree {
     /// # Returns
     ///
     /// The current commitment (hash of the root node) of the Indexed Merkle tree.
-    pub fn get_commitment(&self) -> Result<String, MerkleTreeError> {
-        Ok(self.get_root()?.get_hash().to_string())
+    pub fn get_commitment(&self) -> Result<[u8; 32], MerkleTreeError> {
+        Ok(self.get_root()?.get_hash())
     }
 
     /// Finds the index of a specific node in the indexed Merkle Tree.
@@ -320,7 +321,7 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     /// An `Option<Node>` representing the found leaf node, if any.
-    pub fn find_leaf_by_label(&self, label: &String) -> Option<Node> {
+    pub fn find_leaf_by_label(&self, label: &[u8; 32]) -> Option<Node> {
         self.nodes.iter().find_map(|node| match node {
             Node::Leaf(leaf) => {
                 if &leaf.label == label {
@@ -364,10 +365,10 @@ impl IndexedMerkleTree {
             return Err(MerkleTreeError::IndexError(index.to_string()));
         }
 
-        let mut proof_path: Vec<Node> = vec![];
+        let mut proof_path: Vec<ZkNode> = vec![];
         let mut current_index = index;
 
-        let leaf_node = self.nodes[current_index].clone();
+        let leaf_node = self.nodes[current_index].to_zk_compatible().clone();
         proof_path.push(leaf_node);
 
         // climb the tree until we reach the root and add each parent node sibling of the current node to the proof list
@@ -378,7 +379,7 @@ impl IndexedMerkleTree {
             } else {
                 current_index - 1
             };
-            let sibling_node = self.nodes[sibling_index].clone();
+            let sibling_node = self.nodes[sibling_index].to_zk_compatible().clone();
             proof_path.push(sibling_node);
             // we have to round up, because if there are e.g. 15 elements (8 leaves) the parent of index 0 would be 7 (or 7.5)
             // but the actual parent of index 0 is 8
@@ -417,21 +418,13 @@ impl IndexedMerkleTree {
         let mut found_index = None;
         for (index, current_node) in self.nodes.iter().enumerate() {
             if let Node::Leaf(current_leaf) = current_node {
-                let current_label = BigInt::from_str_radix(&current_leaf.label, 16);
-                let current_next = BigInt::from_str_radix(&current_leaf.next, 16);
-                let new_label = BigInt::from_str_radix(&given_node_as_leaf.label, 16);
+                let current_label = BigInt::from_bytes_be(Sign::Plus, &current_leaf.label);
+                let current_next = BigInt::from_bytes_be(Sign::Plus, &current_leaf.next);
+                let new_label = BigInt::from_bytes_be(Sign::Plus, &given_node_as_leaf.label);
 
-                if let (Ok(current_label), Ok(current_next), Ok(new_label)) =
-                    (current_label, current_next, new_label)
-                {
-                    if current_label < new_label && new_label < current_next {
-                        found_index = Some(index);
-                        break;
-                    }
-                } else {
-                    return Err(MerkleTreeError::InvalidFormatError(format!(
-                        "BigInt from label or next pointer"
-                    )));
+                if current_label < new_label && new_label < current_next {
+                    found_index = Some(index);
+                    break;
                 }
             }
         }
@@ -595,7 +588,11 @@ pub fn resort_nodes_by_input_order(
             label.and_then(|l| {
                 input_order
                     .iter()
-                    .position(|k| k == &l)
+                    .position(|k| {
+                        // TODO: remove unwrap
+                        let decoded = hex::decode(k).unwrap();
+                        decoded == l
+                    })
                     .map(|index| (index, node))
             })
         })
