@@ -15,21 +15,21 @@ use sha2::{Digest, Sha256};
 ///
 /// # Returns
 /// A `String` representing the hexadecimal SHA256 hash of the input.
-fn sha256(input: &[u8]) -> [u8; 32] {
+pub fn sha256(input: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(input);
     let result = hasher.finalize();
     Into::<[u8; 32]>::into(result)
 }
 
-fn concat_arrays(left: [u8; 32], right: [u8; 32]) -> [u8; 64] {
+pub fn concat_arrays(left: [u8; 32], right: [u8; 32]) -> [u8; 64] {
     let mut combined = [0u8; 64];
     combined[..32].copy_from_slice(&left);
     combined[32..].copy_from_slice(&right);
     combined
 }
 
-fn concat_four_arrays(a: u8, b: [u8; 32], c: [u8; 32], d: [u8; 32]) -> [u8; 97] {
+pub fn concat_four_arrays(a: u8, b: [u8; 32], c: [u8; 32], d: [u8; 32]) -> [u8; 97] {
     let mut combined = [0u8; 97];
     combined[0] = a;
     combined[1..33].copy_from_slice(&b);
