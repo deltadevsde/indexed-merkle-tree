@@ -227,7 +227,7 @@ impl IndexedMerkleTree {
     ///
     /// This is done when first initializing the tree, as well as when nodes are updated.
     fn rebuild_tree_from_leaves(&mut self) {
-        self.nodes.retain(|node| matches!(node, Node::Leaf(_)))
+        self.nodes.retain(|node| matches!(node, Node::Leaf(_)));
         self.rehash_inner_nodes(&self.nodes.clone());
     }
 
@@ -505,7 +505,8 @@ impl IndexedMerkleTree {
         let mut new_old_node = self.nodes[non_membership_proof.closest_index].clone();
         Node::update_next_pointer(&mut new_old_node, new_node);
         new_old_node.generate_hash();
-        let first_proof = self.update_node(non_membership_proof.closest_index, new_old_node.clone())?;
+        let first_proof =
+            self.update_node(non_membership_proof.closest_index, new_old_node.clone())?;
 
         // we checked if the found index in the non-membership is from an incative node, if not we have to search for another inactive node to update and if we cant find one, we have to double the tree
         let mut new_index = None;
