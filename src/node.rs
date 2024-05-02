@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::{concat_arrays, concat_four_arrays, sha256};
+use crate::{concat_slices, sha256};
 
 /// Represents an inner node in the indexed Merkle Tree.
 ///
@@ -46,7 +46,7 @@ impl InnerNode {
     /// An `InnerNode` representing the newly created inner node.
     pub fn new(left: Node, right: Node, index: usize) -> Self {
         InnerNode {
-            hash: sha256(&concat_arrays(left.get_hash(), right.get_hash())),
+            hash: sha256(&concat_slices(vec![&left.get_hash(), &right.get_hash()])),
             is_left_sibling: index % 2 == 0,
             left: Arc::new(left),
             right: Arc::new(right),
@@ -67,7 +67,7 @@ impl InnerNode {
 impl ZkInnerNode {
     pub fn new(left: [u8; 32], right: [u8; 32], index: usize) -> Self {
         ZkInnerNode {
-            hash: sha256(&concat_arrays(left, right)),
+            hash: sha256(&concat_slices(vec![&left, &right])),
             is_left_sibling: index % 2 == 0,
             left,
             right,
@@ -123,7 +123,7 @@ impl LeafNode {
         value: [u8; 32],
         next: [u8; 32],
     ) -> Self {
-        let hash = concat_four_arrays(active as u8, label, value, next);
+        let hash = concat_slices(vec![&[active as u8], &label, &value, &next]);
         LeafNode {
             hash: sha256(&hash),
             is_left_sibling: is_left,
@@ -313,11 +313,16 @@ impl Node {
     pub fn generate_hash(&mut self) {
         match self {
             Node::Inner(node) => {
-                let hash = concat_arrays(node.left.get_hash(), node.right.get_hash());
+                let hash = concat_slices(vec![&node.left.get_hash(), &node.right.get_hash()]);
                 node.hash = sha256(&hash);
             }
             Node::Leaf(leaf) => {
-                let hash = concat_four_arrays(leaf.active as u8, leaf.label, leaf.value, leaf.next);
+                let hash = concat_slices(vec![
+                    &[leaf.active as u8],
+                    &leaf.label,
+                    &leaf.value,
+                    &leaf.next,
+                ]);
                 leaf.hash = sha256(&hash);
             }
         }
@@ -469,11 +474,16 @@ impl ZkNode {
     pub fn generate_hash(&mut self) {
         match self {
             ZkNode::Inner(node) => {
-                let hash = concat_arrays(node.left, node.right);
+                let hash = concat_slices(vec![&node.left, &node.right]);
                 node.hash = sha256(&hash);
             }
             ZkNode::Leaf(leaf) => {
-                let hash = concat_four_arrays(leaf.active as u8, leaf.label, leaf.value, leaf.next);
+                let hash = concat_slices(vec![
+                    &[leaf.active as u8],
+                    &leaf.label,
+                    &leaf.value,
+                    &leaf.next,
+                ]);
                 leaf.hash = sha256(&hash);
             }
         }
