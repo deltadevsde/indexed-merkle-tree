@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 ///
 /// # Returns
 /// A `String` representing the hexadecimal SHA256 hash of the input.
-pub fn sha256(input: &Vec<u8>) -> [u8; 32] {
+pub fn sha256(input: impl AsRef<[u8]>) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(input);
     let result = hasher.finalize();
