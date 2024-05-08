@@ -1,8 +1,13 @@
+#![no_std]
 pub mod error;
 pub mod node;
 pub mod tree;
 
+extern crate alloc;
+
 use sha2::{Digest, Sha256};
+
+use alloc::vec::Vec;
 
 /// Computes the SHA256 hash of the given string.
 ///

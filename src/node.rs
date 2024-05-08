@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::sync::Arc;
@@ -69,8 +70,11 @@ impl InnerNode {
 // TODO use generics, macros or trait to avoid code duplication, now only for testing purposes
 impl ZkInnerNode {
     pub fn new(left: [u8; 32], right: [u8; 32], index: usize) -> Self {
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&left);
+        combined.extend_from_slice(&right);
         ZkInnerNode {
-            hash: sha256(&concat_slices(vec![&left, &right])),
+            hash: sha256(&concat_slices(combined)),
             is_left_sibling: index % 2 == 0,
             left,
             right,
@@ -126,7 +130,12 @@ impl LeafNode {
         value: [u8; 32],
         next: [u8; 32],
     ) -> Self {
-        let hash = concat_slices(vec![&[active as u8], &label, &value, &next]);
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&[active as u8]);
+        combined.extend_from_slice(&label);
+        combined.extend_from_slice(&value);
+        combined.extend_from_slice(&next);
+        let hash = concat_slices(combined);
         LeafNode {
             hash: sha256(&hash),
             is_left_sibling: is_left,
@@ -478,20 +487,24 @@ impl ZkNode {
     ///     SHA256(left_child_hash || right_child_hash)
     /// For a leaf node, the hash is based on its active status, label, value, and the reference to the next node in the tree:
     ///     SHA256(active || label || value || next)
+
     pub fn generate_hash(&mut self) {
         match self {
             ZkNode::Inner(node) => {
-                let hash = concat_slices(vec![&node.left, &node.right]);
-                node.hash = sha256(&hash);
+                let mut combined = Vec::new();
+                combined.extend_from_slice(&node.left);
+                combined.extend_from_slice(&node.right);
+
+                node.hash = sha256(&combined);
             }
             ZkNode::Leaf(leaf) => {
-                let hash = concat_slices(vec![
-                    &[leaf.active as u8],
-                    &leaf.label,
-                    &leaf.value,
-                    &leaf.next,
-                ]);
-                leaf.hash = sha256(&hash);
+                let mut combined = Vec::new();
+                combined.push(leaf.active as u8);
+                combined.extend_from_slice(&leaf.label);
+                combined.extend_from_slice(&leaf.value);
+                combined.extend_from_slice(&leaf.next);
+
+                leaf.hash = sha256(&combined);
             }
         }
     }

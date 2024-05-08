@@ -1,10 +1,13 @@
 use serde::{de, Deserialize, Serialize};
+extern crate alloc;
 
 use crate::error::MerkleTreeError;
 use crate::node::{self, LeafNode, ZkNode};
 #[cfg(feature = "std")]
 use crate::node::{InnerNode, Node};
 use crate::{concat_slices, sha256};
+
+use alloc::vec::Vec;
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -112,10 +115,15 @@ impl MerkleProof {
                 let mut current_hash = path[0].get_hash();
 
                 for node in path.iter().skip(1) {
+                    let mut combined = Vec::new();
                     let hash = if node.is_left_sibling() {
-                        concat_slices(vec![&node.get_hash(), &current_hash])
+                        combined.extend_from_slice(&node.get_hash());
+                        combined.extend_from_slice(&current_hash);
+                        concat_slices(combined)
                     } else {
-                        concat_slices(vec![&current_hash, &node.get_hash()])
+                        combined.extend_from_slice(&current_hash);
+                        combined.extend_from_slice(&node.get_hash());
+                        concat_slices(combined)
                     };
                     current_hash = sha256(&hash);
                 }
