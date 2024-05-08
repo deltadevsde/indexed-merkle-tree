@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
 use std::sync::Arc;
 
 use crate::{concat_slices, sha256};
@@ -14,6 +15,7 @@ use crate::{concat_slices, sha256};
 /// - `is_left_sibling`: Indicates whether this node is a left child of its parent.
 /// - `left`: A reference-counted pointer to the left child node.
 /// - `right`: A reference-counted pointer to the right child node.
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InnerNode {
     pub hash: [u8; 32],
@@ -30,6 +32,7 @@ pub struct ZkInnerNode {
     pub right: [u8; 32],
 }
 
+#[cfg(feature = "std")]
 impl InnerNode {
     /// Creates a new inner node.
     ///
@@ -135,6 +138,7 @@ impl LeafNode {
     }
 }
 
+#[cfg(feature = "std")]
 impl Default for LeafNode {
     fn default() -> Self {
         LeafNode::new(
@@ -158,6 +162,7 @@ impl Default for LeafNode {
 /// Variants:
 /// - `Inner(InnerNode)`: An inner node of the tree, containing references to child nodes.
 /// - `Leaf(LeafNode)`: A leaf node, containing the actual data (hash of its metadata).
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Node {
     Inner(InnerNode),
@@ -170,12 +175,14 @@ pub enum ZkNode {
     Leaf(LeafNode),
 }
 
+#[cfg(feature = "std")]
 impl Default for Node {
     fn default() -> Self {
         Node::Leaf(LeafNode::default())
     }
 }
 
+#[cfg(feature = "std")]
 impl Node {
     /// A placeholder for label/value values in inactive (empty) leaf nodes in the indexed Merkle Tree.
     /// It's also the fixed label of the first element in the indexed Merkle tree, because it's the

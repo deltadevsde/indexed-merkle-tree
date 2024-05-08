@@ -1,7 +1,9 @@
 use serde::{de, Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
-use crate::node::{self, InnerNode, LeafNode, Node, ZkNode};
+use crate::node::{self, LeafNode, ZkNode};
+#[cfg(feature = "std")]
+use crate::node::{InnerNode, Node};
 use crate::{concat_slices, sha256};
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
@@ -142,11 +144,13 @@ pub enum Proof {
 ///
 /// Fields:
 /// - `nodes`: A vector of `Node` elements, representing the nodes of the indexed merkle tree.
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Clone)]
 pub struct IndexedMerkleTree {
     pub nodes: Vec<Node>,
 }
 
+#[cfg(feature = "std")]
 impl IndexedMerkleTree {
     /// Creates a new `IndexedMerkleTree` from a given `nodes` vector.
     ///
@@ -543,6 +547,7 @@ impl IndexedMerkleTree {
 ///
 /// # Returns
 /// A `Vec<Node>` with updated left sibling status for each node.
+#[cfg(feature = "std")]
 pub fn set_left_sibling_status_for_nodes(nodes: Vec<Node>) -> Vec<Node> {
     let new: Vec<Node> = nodes
         .into_iter()
@@ -567,6 +572,7 @@ pub fn set_left_sibling_status_for_nodes(nodes: Vec<Node>) -> Vec<Node> {
 ///
 /// # Returns
 /// A `Result<Vec<Node>, MerkleTreeError>` representing the sorted nodes or an error.
+#[cfg(feature = "std")]
 pub fn resort_nodes_by_input_order(
     nodes: Vec<Node>,
     input_order: Vec<String>,
@@ -602,6 +608,7 @@ pub fn resort_nodes_by_input_order(
     Ok(sorted_nodes)
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;

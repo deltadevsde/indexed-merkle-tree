@@ -10,8 +10,12 @@ license = "MIT"
 keywords = ["crypto", "merkle-tree", "membership", "non-membership"]
 readme = "README.md"
 
+[features]
+default = []
+std = []
+
 [dependencies]
-serde = { version = "1.0.151", features = ["derive", "rc"] }
+serde = { version = "1.0.151", features = ["derive", "alloc"], default-features = false}
 no-std-thiserror = "0.1.0"
 serde_json = { version = "1.0.117", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
