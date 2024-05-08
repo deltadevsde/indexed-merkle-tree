@@ -1,13 +1,13 @@
-use serde::{de, Deserialize, Serialize};
+use crate::{concat_slices, sha256};
+use alloc::{string::String, vec::Vec};
+use serde::{Deserialize, Serialize};
+
 extern crate alloc;
 
-use crate::error::MerkleTreeError;
-use crate::node::{self, LeafNode, ZkNode};
-#[cfg(feature = "std")]
-use crate::node::{InnerNode, Node};
-use crate::{concat_slices, sha256};
+use crate::node::{LeafNode, Node};
 
-use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use {crate::error::MerkleTreeError, crate::node::InnerNode};
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -15,7 +15,7 @@ pub struct MerkleProof {
     // Root hash of the Merkle Tree.
     pub root_hash: [u8; 32],
     // Path from the leaf to the root.
-    pub path: Vec<ZkNode>,
+    pub path: Vec<Node>,
 }
 
 // `NonMembershipProof` contains the `MerkleProof` of the node where the returned `missing_node: LeafNode` would be found.
@@ -58,7 +58,7 @@ impl NonMembershipProof {
     /// # Returns
     /// `true` if the proof is valid and the node is not present, `false` otherwise.
     pub fn verify(&self) -> bool {
-        if let Some(ZkNode::Leaf(leaf)) = self.merkle_proof.path.first() {
+        if let Some(Node::Leaf(leaf)) = self.merkle_proof.path.first() {
             if self.merkle_proof.verify()
                 && self.missing_node.label < leaf.label
                 && self.missing_node.label < leaf.next
@@ -375,10 +375,10 @@ impl IndexedMerkleTree {
             return Err(MerkleTreeError::IndexError(index.to_string()));
         }
 
-        let mut proof_path: Vec<ZkNode> = vec![];
+        let mut proof_path: Vec<Node> = Vec::new();
         let mut current_index = index;
 
-        let leaf_node = self.nodes[current_index].to_zk_compatible().clone();
+        let leaf_node = self.nodes[current_index].clone();
         proof_path.push(leaf_node);
 
         // climb the tree until we reach the root and add each parent node sibling of the current node to the proof list
@@ -389,7 +389,7 @@ impl IndexedMerkleTree {
             } else {
                 current_index - 1
             };
-            let sibling_node = self.nodes[sibling_index].to_zk_compatible().clone();
+            let sibling_node = self.nodes[sibling_index].clone();
             proof_path.push(sibling_node);
             // we have to round up, because if there are e.g. 15 elements (8 leaves) the parent of index 0 would be 7 (or 7.5)
             // but the actual parent of index 0 is 8
