@@ -11,11 +11,9 @@ keywords = ["crypto", "merkle-tree", "membership", "non-membership"]
 readme = "README.md"
 
 [dependencies]
-crypto-hash = "0.3.4"
-num = "0.4.0"
 serde = { version = "1.0.151", features = ["derive", "rc"] }
-thiserror = "1.0.50"
-serde_json = "1.0.79"
+no-std-thiserror = "0.1.0"
+serde_json = { version = "1.0.117", default-features = false, features = ["alloc"] }
 cargo-audit = "0.20.0"
 sha2 = "0.10.8"
-hex = "0.4.3"
+hex = {version = "0.4.3", default-features = false }

@@ -1,5 +1,3 @@
-use num::bigint::Sign;
-use num::{BigInt, Num};
 use serde::{de, Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
@@ -418,11 +416,9 @@ impl IndexedMerkleTree {
         let mut found_index = None;
         for (index, current_node) in self.nodes.iter().enumerate() {
             if let Node::Leaf(current_leaf) = current_node {
-                let current_label = BigInt::from_bytes_be(Sign::Plus, &current_leaf.label);
-                let current_next = BigInt::from_bytes_be(Sign::Plus, &current_leaf.next);
-                let new_label = BigInt::from_bytes_be(Sign::Plus, &given_node_as_leaf.label);
-
-                if current_label < new_label && new_label < current_next {
+                if &current_leaf.label < &given_node_as_leaf.label
+                    && given_node_as_leaf.label < current_leaf.next
+                {
                     found_index = Some(index);
                     break;
                 }
@@ -590,8 +586,9 @@ pub fn resort_nodes_by_input_order(
                     .iter()
                     .position(|k| {
                         // TODO: remove unwrap
-                        let decoded = hex::decode(k).unwrap();
-                        decoded == l
+                        let mut bytes = [0u8; 32];
+                        hex::decode_to_slice(k, &mut bytes).unwrap();
+                        bytes == l
                     })
                     .map(|index| (index, node))
             })
