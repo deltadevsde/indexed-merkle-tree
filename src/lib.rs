@@ -1,4 +1,3 @@
-#![no_std]
 pub mod error;
 pub mod node;
 pub mod tree;

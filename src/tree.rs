@@ -119,11 +119,11 @@ impl MerkleProof {
                     let hash = if node.is_left_sibling() {
                         combined.extend_from_slice(&node.get_hash());
                         combined.extend_from_slice(&current_hash);
-                        concat_slices(combined)
+                        combined
                     } else {
                         combined.extend_from_slice(&current_hash);
                         combined.extend_from_slice(&node.get_hash());
-                        concat_slices(combined)
+                        combined
                     };
                     current_hash = sha256(&hash);
                 }

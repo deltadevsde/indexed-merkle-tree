@@ -1,10 +1,10 @@
 use crate::{concat_slices, sha256};
 use alloc::vec::Vec;
-use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use alloc::sync::Arc;
-
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::sync::Arc;
 /// Represents an inner node in the indexed Merkle Tree.
 ///
 /// This structure is used for non-leaf nodes in the tree, containing references to its
@@ -138,9 +138,9 @@ impl LeafNode {
         combined.extend_from_slice(&label);
         combined.extend_from_slice(&value);
         combined.extend_from_slice(&next);
-        let hash = concat_slices(combined);
+
         LeafNode {
-            hash: sha256(&hash),
+            hash: sha256(&combined),
             is_left_sibling: is_left,
             active,
             value,
