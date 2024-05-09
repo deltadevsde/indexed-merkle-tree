@@ -1,4 +1,4 @@
-use crate::{concat_slices, sha256};
+use crate::sha256;
 use alloc::vec::Vec;
 
 #[cfg(feature = "std")]

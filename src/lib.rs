@@ -25,3 +25,14 @@ pub fn sha256(input: impl AsRef<[u8]>) -> [u8; 32] {
     let result = hasher.finalize();
     Into::<[u8; 32]>::into(result)
 }
+
+pub fn concat_slices(slices: Vec<&[u8]>) -> Vec<u8> {
+    let total_length: usize = slices.iter().map(|s| s.len()).sum();
+    let mut combined = Vec::with_capacity(total_length);
+
+    for slice in slices {
+        combined.extend_from_slice(slice);
+    }
+
+    combined
+}
