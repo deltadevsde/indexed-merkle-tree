@@ -21,7 +21,7 @@ std = ["thiserror/std", "serde/std", "serde/rc"]
 serde = { version = "1.0.151", features = [
     "derive",
     "alloc",
-], default-features = false, optional = true }
+], default-features = false}
 thiserror = { version = "1.0", package = "thiserror-core", default-features = false }
 serde_json = { version = "1.0.117", default-features = false, features = [
     "alloc",

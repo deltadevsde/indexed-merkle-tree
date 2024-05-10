@@ -1,8 +1,7 @@
 use crate::{concat_slices, sha256};
 use alloc::vec::Vec;
-
-#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "std")]
 use std::sync::Arc;
 /// Represents an inner node in the indexed Merkle Tree.
@@ -77,7 +76,7 @@ impl InnerNode {
         combined.extend_from_slice(&left);
         combined.extend_from_slice(&right);
         InnerNode {
-            hash: sha256(&concat_slices(combined)),
+            hash: sha256(&combined),
             is_left_sibling: index % 2 == 0,
             left,
             right,
@@ -230,7 +229,10 @@ impl Node {
     /// Convenience method for creating a new inner node.
     /// See `InnerNode::new` for more information.
     pub fn new_inner(left: Node, right: Node, index: usize) -> Self {
+        #[cfg(feature = "std")]
         return Node::Inner(InnerNode::new(left, right, index));
+        #[cfg(not(feature = "std"))]
+        return Node::Inner(InnerNode::new(left.get_hash(), right.get_hash(), index));
     }
 
     /// Returns the hash of the node.
