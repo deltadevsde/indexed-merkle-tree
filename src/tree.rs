@@ -35,8 +35,8 @@ pub struct NonMembershipProof {
 }
 #[derive(Serialize, Deserialize)]
 pub struct ZkNonMembershipProof {
-    pub root_hash: [u8; 32],
-    pub path: Vec<[u8; 32]>,
+    pub node_to_prove: LeafNode,
+    pub merkle_proof: ZkMerkleProof,
     pub closest_index: usize,
     pub missing_node: [u8; 32],
 }
@@ -197,8 +197,13 @@ impl Proof {
                         .collect(),
                 },
             }),
-            Proof::Insert(insert_proof) => ZkProof::Insert(ZkInsertProof {
-                non_membership_proof: ZkNonMembershipProof {
+            Proof::Insert(insert_proof) => {
+                let node_to_prove =
+                    match insert_proof.non_membership_proof.merkle_proof.path.first() {
+                        Some(Node::Leaf(leaf)) => leaf.clone(),
+                        _ => panic!("First node in path is not a leaf node."),
+                    };
+                let zk_merkle_proof = ZkMerkleProof {
                     root_hash: insert_proof.non_membership_proof.merkle_proof.root_hash,
                     path: insert_proof
                         .non_membership_proof
@@ -207,54 +212,60 @@ impl Proof {
                         .iter()
                         .map(|node| node.get_hash())
                         .collect(),
-                    closest_index: insert_proof.non_membership_proof.closest_index,
-                    missing_node: insert_proof.non_membership_proof.missing_node.label,
-                },
-                first_proof: ZkUpdateProof {
-                    old_proof: ZkMerkleProof {
-                        root_hash: insert_proof.first_proof.old_proof.root_hash,
-                        path: insert_proof
-                            .first_proof
-                            .old_proof
-                            .path
-                            .iter()
-                            .map(|node| node.get_hash())
-                            .collect(),
+                };
+                return ZkProof::Insert(ZkInsertProof {
+                    non_membership_proof: ZkNonMembershipProof {
+                        node_to_prove,
+                        merkle_proof: zk_merkle_proof,
+                        closest_index: insert_proof.non_membership_proof.closest_index,
+                        missing_node: insert_proof.non_membership_proof.missing_node.label,
                     },
-                    new_proof: ZkMerkleProof {
-                        root_hash: insert_proof.first_proof.new_proof.root_hash,
-                        path: insert_proof
-                            .first_proof
-                            .new_proof
-                            .path
-                            .iter()
-                            .map(|node| node.get_hash())
-                            .collect(),
+                    first_proof: ZkUpdateProof {
+                        old_proof: ZkMerkleProof {
+                            root_hash: insert_proof.first_proof.old_proof.root_hash,
+                            path: insert_proof
+                                .first_proof
+                                .old_proof
+                                .path
+                                .iter()
+                                .map(|node| node.get_hash())
+                                .collect(),
+                        },
+                        new_proof: ZkMerkleProof {
+                            root_hash: insert_proof.first_proof.new_proof.root_hash,
+                            path: insert_proof
+                                .first_proof
+                                .new_proof
+                                .path
+                                .iter()
+                                .map(|node| node.get_hash())
+                                .collect(),
+                        },
                     },
-                },
-                second_proof: ZkUpdateProof {
-                    old_proof: ZkMerkleProof {
-                        root_hash: insert_proof.second_proof.old_proof.root_hash,
-                        path: insert_proof
-                            .second_proof
-                            .old_proof
-                            .path
-                            .iter()
-                            .map(|node| node.get_hash())
-                            .collect(),
+                    second_proof: ZkUpdateProof {
+                        old_proof: ZkMerkleProof {
+                            root_hash: insert_proof.second_proof.old_proof.root_hash,
+                            path: insert_proof
+                                .second_proof
+                                .old_proof
+                                .path
+                                .iter()
+                                .map(|node| node.get_hash())
+                                .collect(),
+                        },
+                        new_proof: ZkMerkleProof {
+                            root_hash: insert_proof.second_proof.new_proof.root_hash,
+                            path: insert_proof
+                                .second_proof
+                                .new_proof
+                                .path
+                                .iter()
+                                .map(|node| node.get_hash())
+                                .collect(),
+                        },
                     },
-                    new_proof: ZkMerkleProof {
-                        root_hash: insert_proof.second_proof.new_proof.root_hash,
-                        path: insert_proof
-                            .second_proof
-                            .new_proof
-                            .path
-                            .iter()
-                            .map(|node| node.get_hash())
-                            .collect(),
-                    },
-                },
-            }),
+                });
+            }
         }
     }
 }
