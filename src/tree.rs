@@ -17,7 +17,7 @@ pub struct MerkleProof {
     // Path from the leaf to the root.
     pub path: Vec<Node>,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ZkMerkleProof {
     pub root_hash: [u8; 32],
     pub path: Vec<[u8; 32]>,
@@ -33,7 +33,7 @@ pub struct NonMembershipProof {
     // Node that would be found in the place of the node proved in `merkle_proof`.
     pub missing_node: LeafNode,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ZkNonMembershipProof {
     pub node_to_prove: LeafNode,
     pub merkle_proof: ZkMerkleProof,
@@ -49,7 +49,7 @@ pub struct UpdateProof {
     // Merkle proof after the update.
     pub new_proof: MerkleProof,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ZkUpdateProof {
     pub old_proof: ZkMerkleProof,
     pub new_proof: ZkMerkleProof,
@@ -65,7 +65,7 @@ pub struct InsertProof {
     // Update proof of the new node.
     pub second_proof: UpdateProof,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ZkInsertProof {
     pub non_membership_proof: ZkNonMembershipProof,
     pub first_proof: ZkUpdateProof,
@@ -168,7 +168,7 @@ pub enum Proof {
     Insert(InsertProof),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum ZkProof {
     Update(ZkUpdateProof),
     Insert(ZkInsertProof),
