@@ -1,9 +1,8 @@
 use crate::{concat_slices, sha256};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "std")]
-use std::sync::Arc;
 /// Represents an inner node in the indexed Merkle Tree.
 ///
 /// This structure is used for non-leaf nodes in the tree, containing references to its
@@ -15,7 +14,6 @@ use std::sync::Arc;
 /// - `is_left_sibling`: Indicates whether this node is a left child of its parent.
 /// - `left`: A reference-counted pointer to the left child node.
 /// - `right`: A reference-counted pointer to the right child node.
-#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InnerNode {
     pub hash: [u8; 32],
@@ -24,27 +22,6 @@ pub struct InnerNode {
     pub right: Arc<Node>,
 }
 
-#[cfg(not(feature = "std"))]
-#[derive(Serialize, Deserialize, Debug, Clone)]
-/// Represents an inner node in the indexed Merkle Tree.
-///
-/// This structure is used for non-leaf nodes in the tree, containing references to its
-/// left and right children along with its own hash value. There is no difference between
-/// inner nodes of an indexed Merkle Tree and a classic Merkle Tree.
-///
-/// Fields:
-/// - `hash`: The hash of the current node, derived from its children.
-/// - `is_left_sibling`: Indicates whether this node is a left child of its parent.
-/// - `left`: The hash of the left child node.
-/// - `right`: The hash of the right child node.
-pub struct InnerNode {
-    pub hash: [u8; 32],
-    pub is_left_sibling: bool,
-    pub left: [u8; 32],
-    pub right: [u8; 32],
-}
-
-#[cfg(feature = "std")]
 impl InnerNode {
     /// Creates a new inner node.
     ///
