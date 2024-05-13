@@ -32,9 +32,8 @@ pub struct InnerNode {
     pub right: [u8; 32],
 }
 
-#[cfg(not(feature = "std"))]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct InnerNode {
+pub struct ZkInnerNode {
     pub hash: [u8; 32],
     pub is_left_sibling: bool,
     pub left: [u8; 32],
@@ -64,15 +63,24 @@ impl InnerNode {
             right: Arc::new(right),
         }
     }
+
+    pub fn create_zk_inner_node(&self) -> ZkInnerNode {
+        ZkInnerNode {
+            hash: self.hash,
+            is_left_sibling: self.is_left_sibling,
+            left: self.left.get_hash(),
+            right: self.right.get_hash(),
+        }
+    }
 }
 
 #[cfg(not(feature = "std"))]
-impl InnerNode {
+impl ZkInnerNode {
     pub fn new(left: [u8; 32], right: [u8; 32], index: usize) -> Self {
         let mut combined = Vec::new();
         combined.extend_from_slice(&left);
         combined.extend_from_slice(&right);
-        InnerNode {
+        ZkInnerNode {
             hash: sha256(&combined),
             is_left_sibling: index % 2 == 0,
             left,
@@ -170,31 +178,12 @@ impl Default for LeafNode {
 /// Variants:
 /// - `Inner(InnerNode)`: An inner node of the tree, containing references to child nodes.
 /// - `Leaf(LeafNode)`: A leaf node, containing the actual data (hash of its metadata).
-#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Node {
     Inner(InnerNode),
     Leaf(LeafNode),
 }
 
-/// An enum representing the types of nodes in the indexed Merkle Tree.
-///
-/// This enum allows for the differentiation between inner and leaf nodes in the tree,
-/// facilitating operations like traversal, insertion, and proof generation.
-/// It encapsulates either an `InnerNode` or a `LeafNode`, depending on the node's position
-/// and role in the tree.
-///
-/// Variants:
-/// - `Inner(InnerNode)`: An inner node of the tree, containing references to child nodes.
-/// - `Leaf(LeafNode)`: A leaf node, containing the actual data (hash of its metadata).
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[cfg(not(feature = "std"))]
-pub enum Node {
-    Inner(InnerNode),
-    Leaf(LeafNode),
-}
-
-#[cfg(feature = "std")]
 impl Default for Node {
     fn default() -> Self {
         Node::Leaf(LeafNode::default())
