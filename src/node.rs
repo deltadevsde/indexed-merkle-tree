@@ -18,10 +18,17 @@ use serde::{Deserialize, Serialize};
 pub struct InnerNode {
     pub hash: [u8; 32],
     pub is_left_sibling: bool,
+    #[cfg(feature = "std")]
     pub left: Arc<Node>,
+    #[cfg(feature = "std")]
     pub right: Arc<Node>,
+    #[cfg(not(feature = "std"))]
+    pub left: [u8; 32],
+    #[cfg(not(feature = "std"))]
+    pub right: [u8; 32],
 }
 
+#[cfg(feature = "std")]
 impl InnerNode {
     /// Creates a new inner node.
     ///
