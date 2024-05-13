@@ -65,7 +65,6 @@ impl InnerNode {
     }
 }
 
-#[cfg(not(feature = "std"))]
 impl ZkInnerNode {
     pub fn new(left: [u8; 32], right: [u8; 32], index: usize) -> Self {
         let mut combined = Vec::new();
@@ -354,6 +353,108 @@ impl Node {
                 right: inner.right.get_hash(),
             }),
             Node::Leaf(leaf) => ZkNode::Leaf(leaf.clone()),
+        }
+    }
+}
+
+impl ZkNode {
+    /// A placeholder for label/value values in inactive (empty) leaf nodes in the indexed Merkle Tree.
+    /// It's also the fixed label of the first element in the indexed Merkle tree, because it's the
+    /// lowest possible number in with 256 output bits from sha256.
+    pub const EMPTY_HASH: [u8; 32] = [0; 32];
+
+    /// This constant is used to designate the last element (because it's the highest possible number in with 256 output bits from sha256)
+    /// in the indexed Merkle tree. The next pointer from the largest label in the current tree, as well as the next pointer from inactive leaf nodes "point" to it.
+    pub const TAIL: [u8; 32] = [0xFF; 32];
+
+    /// Convenience method for creating a new leaf node.
+    /// See `LeafNode::new` for more information.
+    pub fn new_leaf(
+        active: bool,
+        is_left: bool,
+        label: [u8; 32],
+        value: [u8; 32],
+        next: [u8; 32],
+    ) -> Self {
+        return ZkNode::Leaf(LeafNode::new(active, is_left, label, value, next));
+    }
+
+    /// Convenience method for creating a new inner node.
+    /// See `InnerNode::new` for more information.
+    pub fn new_inner(left: Node, right: Node, index: usize) -> Self {
+        return ZkNode::Inner(ZkInnerNode::new(left.get_hash(), right.get_hash(), index));
+    }
+
+    /// Returns the hash of the node.
+    ///
+    /// This function returns the hash of either an inner node or a leaf node, depending on the node type.
+    pub fn get_hash(&self) -> [u8; 32] {
+        match self {
+            ZkNode::Inner(inner_node) => inner_node.hash.clone(),
+            ZkNode::Leaf(leaf) => leaf.hash.clone(),
+        }
+    }
+
+    /// Determines if the node is a left sibling.
+    ///
+    /// This function checks whether the node (either inner or leaf) is a left sibling
+    /// in its parent node's context. This information is important in the tree's traversal
+    /// and structure maintenance, ensuring the correct positioning and integrity of the nodes.
+    pub fn is_left_sibling(&self) -> bool {
+        match self {
+            ZkNode::Inner(inner_node) => inner_node.is_left_sibling,
+            ZkNode::Leaf(leaf) => leaf.is_left_sibling,
+        }
+    }
+
+    /// Determines if the node is active.
+    ///
+    /// For inner nodes, this function always returns true. For leaf nodes, it checks the `active` flag.
+    /// This method is important to understand the current state of a node within the tree,
+    /// especially for insert operations to recognize the need for capacity duplication of the tree if necessary.
+    pub fn is_active(&self) -> bool {
+        match self {
+            ZkNode::Inner(_) => true,
+            ZkNode::Leaf(leaf) => leaf.active,
+        }
+    }
+
+    /// Sets the left sibling status of the node.
+    ///
+    /// This function updates whether the node (inner or leaf) is considered a left sibling.
+    /// This is crucial for maintaining the structural integrity of the tree, especially when nodes
+    /// are inserted or reorganized.
+    pub fn set_left_sibling_value(&mut self, is_left: bool) {
+        match self {
+            ZkNode::Inner(inner_node) => inner_node.is_left_sibling = is_left,
+            ZkNode::Leaf(leaf) => leaf.is_left_sibling = is_left,
+        }
+    }
+
+    /// Activates a leaf node.
+    ///
+    /// This function sets the `active` flag of a leaf node to true. It has no effect on inner nodes, because they are always active.
+    /// Activating a leaf node can be an important operation when managing the data within the indexed Merkle Tree,
+    /// especially in scenarios involving data updates or dynamic tree modifications.
+    pub fn set_node_active(&mut self) {
+        match self {
+            ZkNode::Inner(_) => (),
+            ZkNode::Leaf(ref mut leaf) => leaf.active = true,
+        }
+    }
+
+    /// Updates the 'next' pointer of a leaf node.
+    ///
+    /// This function is used to update the reference to the next node in the indexed Merkle Tree.
+    ///
+    /// # Arguments
+    /// * `existing_node` - The leaf node to update.
+    /// * `new_node` - The new node whose label will be used for the 'next' pointer.
+    pub fn update_next_pointer(existing_node: &mut Self, new_node: &Self) {
+        if let Self::Leaf(ref mut existing_leaf) = existing_node {
+            if let Self::Leaf(new_leaf) = new_node {
+                existing_leaf.next = new_leaf.label.clone();
+            }
         }
     }
 }
