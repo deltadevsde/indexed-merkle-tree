@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 extern crate alloc;
 
 use crate::{
-    node::{LeafNode, Node, ZkNode},
+    node::{create_zk_node, LeafNode, Node, ZkNode},
     sha256,
 };
 
@@ -189,7 +189,7 @@ impl Proof {
                         .old_proof
                         .path
                         .iter()
-                        .map(|n| n.create_zk_node())
+                        .map(|n| create_zk_node(n))
                         .collect(),
                 },
                 new_proof: ZkMerkleProof {
@@ -198,7 +198,7 @@ impl Proof {
                         .new_proof
                         .path
                         .iter()
-                        .map(|n| n.create_zk_node())
+                        .map(|n| create_zk_node(n))
                         .collect(),
                 },
             }),
@@ -212,7 +212,7 @@ impl Proof {
                             .merkle_proof
                             .path
                             .iter()
-                            .map(|n| n.create_zk_node())
+                            .map(|n| create_zk_node(n))
                             .collect(),
                     },
                     closest_index: insert_proof.non_membership_proof.closest_index,
@@ -226,7 +226,7 @@ impl Proof {
                             .old_proof
                             .path
                             .iter()
-                            .map(|n| n.create_zk_node())
+                            .map(|n| create_zk_node(n))
                             .collect(),
                     },
                     new_proof: ZkMerkleProof {
@@ -236,7 +236,7 @@ impl Proof {
                             .new_proof
                             .path
                             .iter()
-                            .map(|n| n.create_zk_node())
+                            .map(|n| create_zk_node(n))
                             .collect(),
                     },
                 },
@@ -248,7 +248,7 @@ impl Proof {
                             .old_proof
                             .path
                             .iter()
-                            .map(|n| n.create_zk_node())
+                            .map(|n| create_zk_node(n))
                             .collect(),
                     },
                     new_proof: ZkMerkleProof {
@@ -258,7 +258,7 @@ impl Proof {
                             .new_proof
                             .path
                             .iter()
-                            .map(|n| n.create_zk_node())
+                            .map(|n| create_zk_node(n))
                             .collect(),
                     },
                 },

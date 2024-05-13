@@ -343,17 +343,17 @@ impl Node {
             }
         }
     }
+}
 
-    pub fn create_zk_node(&self) -> ZkNode {
-        match self {
-            Node::Inner(inner) => ZkNode::Inner(ZkInnerNode {
-                hash: inner.hash,
-                is_left_sibling: inner.is_left_sibling,
-                left: inner.left.get_hash(),
-                right: inner.right.get_hash(),
-            }),
-            Node::Leaf(leaf) => ZkNode::Leaf(leaf.clone()),
-        }
+pub fn create_zk_node(node: &Node) -> ZkNode {
+    match node {
+        Node::Inner(inner) => ZkNode::Inner(ZkInnerNode {
+            hash: inner.hash,
+            is_left_sibling: inner.is_left_sibling,
+            left: inner.left.get_hash(),
+            right: inner.right.get_hash(),
+        }),
+        Node::Leaf(leaf) => ZkNode::Leaf(leaf.clone()),
     }
 }
 
