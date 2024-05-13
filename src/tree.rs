@@ -1,21 +1,40 @@
-use num::{BigInt, Num};
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::error::MerkleTreeError;
-use crate::node::{self, InnerNode, LeafNode, Node};
-use crate::sha256;
+extern crate alloc;
+
+use crate::{
+    node::{LeafNode, ZkNode},
+    sha256,
+};
+
+#[cfg(feature = "std")]
+use {
+    crate::error::MerkleTreeError,
+    crate::node::{InnerNode, Node},
+};
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MerkleProof {
     // Root hash of the Merkle Tree.
-    pub root_hash: String,
+    pub root_hash: [u8; 32],
     // Path from the leaf to the root.
     pub path: Vec<Node>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ZkMerkleProof {
+    // Root hash of the Merkle Tree.
+    pub root_hash: [u8; 32],
+    // Path from the leaf to the root.
+    pub path: Vec<ZkNode>,
+}
+
 // `NonMembershipProof` contains the `MerkleProof` of the node where the returned `missing_node: LeafNode` would be found.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg(feature = "std")]
 pub struct NonMembershipProof {
     // Merkle proof of the node that `missing_node` would be found between `label` and `next`.
     pub merkle_proof: MerkleProof,
@@ -24,8 +43,16 @@ pub struct NonMembershipProof {
     // Node that would be found in the place of the node proved in `merkle_proof`.
     pub missing_node: LeafNode,
 }
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ZkNonMembershipProof {
+    pub node_to_prove: LeafNode,
+    pub merkle_proof: ZkMerkleProof,
+    pub closest_index: usize,
+    pub missing_node: [u8; 32],
+}
 
 // `UpdateProof` contains the old `MerkleProof` and the new `MerkleProof` after the update operation
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpdateProof {
     // Merkle proof before the update.
@@ -33,9 +60,15 @@ pub struct UpdateProof {
     // Merkle proof after the update.
     pub new_proof: MerkleProof,
 }
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ZkUpdateProof {
+    pub old_proof: ZkMerkleProof,
+    pub new_proof: ZkMerkleProof,
+}
 
 // `InsertProof` contains the non-membership proof of the new `Node` (to guarantee uniqueness), and two `UpdateProof`s.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg(feature = "std")]
 pub struct InsertProof {
     // Non-membership proof of the new node.
     pub non_membership_proof: NonMembershipProof,
@@ -44,7 +77,14 @@ pub struct InsertProof {
     // Update proof of the new node.
     pub second_proof: UpdateProof,
 }
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ZkInsertProof {
+    pub non_membership_proof: ZkNonMembershipProof,
+    pub first_proof: ZkUpdateProof,
+    pub second_proof: ZkUpdateProof,
+}
 
+#[cfg(feature = "std")]
 impl NonMembershipProof {
     /// Verifies the non-membership proof of a node in the indexed Merkle Tree.
     ///
@@ -66,6 +106,7 @@ impl NonMembershipProof {
     }
 }
 
+#[cfg(feature = "std")]
 impl InsertProof {
     /// Verifies the proofs associated with a node insertion in the indexed Merkle Tree.
     ///
@@ -82,6 +123,7 @@ impl InsertProof {
     }
 }
 
+#[cfg(feature = "std")]
 impl UpdateProof {
     /// Verifies an update proof in the indexed Merkle Tree.
     ///
@@ -95,6 +137,7 @@ impl UpdateProof {
     }
 }
 
+#[cfg(feature = "std")]
 impl MerkleProof {
     /// Verifies a Merkle proof against a given root hash.
     ///
@@ -111,10 +154,15 @@ impl MerkleProof {
                 let mut current_hash = path[0].get_hash();
 
                 for node in path.iter().skip(1) {
+                    let mut combined = Vec::new();
                     let hash = if node.is_left_sibling() {
-                        format!("{}{}", node.get_hash(), current_hash)
+                        combined.extend_from_slice(&node.get_hash());
+                        combined.extend_from_slice(&current_hash);
+                        combined
                     } else {
-                        format!("{}{}", current_hash, node.get_hash())
+                        combined.extend_from_slice(&current_hash);
+                        combined.extend_from_slice(&node.get_hash());
+                        combined
                     };
                     current_hash = sha256(&hash);
                 }
@@ -131,9 +179,105 @@ impl MerkleProof {
 /// - `Update(UpdateProof)`: Represents a proof for an update operation.
 /// - `Insert(InsertProof)`: Represents a proof for an insert operation.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg(feature = "std")]
 pub enum Proof {
     Update(UpdateProof),
     Insert(InsertProof),
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub enum ZkProof {
+    Update(ZkUpdateProof),
+    Insert(ZkInsertProof),
+}
+
+#[cfg(feature = "std")]
+impl Proof {
+    pub fn prepare_for_snark(&self) -> ZkProof {
+        match self {
+            Proof::Update(update_proof) => ZkProof::Update(ZkUpdateProof {
+                old_proof: ZkMerkleProof {
+                    root_hash: update_proof.old_proof.root_hash,
+                    path: update_proof
+                        .old_proof
+                        .path
+                        .iter()
+                        .map(|n| n.create_zk_node())
+                        .collect(),
+                },
+                new_proof: ZkMerkleProof {
+                    root_hash: update_proof.new_proof.root_hash,
+                    path: update_proof
+                        .new_proof
+                        .path
+                        .iter()
+                        .map(|n| n.create_zk_node())
+                        .collect(),
+                },
+            }),
+            Proof::Insert(insert_proof) => ZkProof::Insert(ZkInsertProof {
+                non_membership_proof: ZkNonMembershipProof {
+                    node_to_prove: insert_proof.non_membership_proof.missing_node.clone(),
+                    merkle_proof: ZkMerkleProof {
+                        root_hash: insert_proof.non_membership_proof.merkle_proof.root_hash,
+                        path: insert_proof
+                            .non_membership_proof
+                            .merkle_proof
+                            .path
+                            .iter()
+                            .map(|n| n.create_zk_node())
+                            .collect(),
+                    },
+                    closest_index: insert_proof.non_membership_proof.closest_index,
+                    missing_node: insert_proof.non_membership_proof.missing_node.label,
+                },
+                first_proof: ZkUpdateProof {
+                    old_proof: ZkMerkleProof {
+                        root_hash: insert_proof.first_proof.old_proof.root_hash,
+                        path: insert_proof
+                            .first_proof
+                            .old_proof
+                            .path
+                            .iter()
+                            .map(|n| n.create_zk_node())
+                            .collect(),
+                    },
+                    new_proof: ZkMerkleProof {
+                        root_hash: insert_proof.first_proof.new_proof.root_hash,
+                        path: insert_proof
+                            .first_proof
+                            .new_proof
+                            .path
+                            .iter()
+                            .map(|n| n.create_zk_node())
+                            .collect(),
+                    },
+                },
+                second_proof: ZkUpdateProof {
+                    old_proof: ZkMerkleProof {
+                        root_hash: insert_proof.second_proof.old_proof.root_hash,
+                        path: insert_proof
+                            .second_proof
+                            .old_proof
+                            .path
+                            .iter()
+                            .map(|n| n.create_zk_node())
+                            .collect(),
+                    },
+                    new_proof: ZkMerkleProof {
+                        root_hash: insert_proof.second_proof.new_proof.root_hash,
+                        path: insert_proof
+                            .second_proof
+                            .new_proof
+                            .path
+                            .iter()
+                            .map(|n| n.create_zk_node())
+                            .collect(),
+                    },
+                },
+            }),
+        }
+    }
 }
 
 /// Represents an indexed merkle tree.
@@ -143,11 +287,13 @@ pub enum Proof {
 ///
 /// Fields:
 /// - `nodes`: A vector of `Node` elements, representing the nodes of the indexed merkle tree.
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Clone)]
 pub struct IndexedMerkleTree {
     pub nodes: Vec<Node>,
 }
 
+#[cfg(feature = "std")]
 impl IndexedMerkleTree {
     /// Creates a new `IndexedMerkleTree` from a given `nodes` vector.
     ///
@@ -176,8 +322,8 @@ impl IndexedMerkleTree {
     /// A `Result<Self, MerkleTreeError>` representing the initialized tree or an error.
     pub fn new_with_size(size: usize) -> Result<Self, MerkleTreeError> {
         let mut nodes: Vec<Node> = Vec::with_capacity(2 * size + 1);
-        let empty_hash = Node::EMPTY_HASH.to_string();
-        let tail = Node::TAIL.to_string();
+        let empty_hash = Node::EMPTY_HASH;
+        let tail = Node::TAIL;
 
         let active_node = Node::new_leaf(
             true,
@@ -227,7 +373,7 @@ impl IndexedMerkleTree {
     ///
     /// This is done when first initializing the tree, as well as when nodes are updated.
     fn rebuild_tree_from_leaves(&mut self) {
-        self.nodes.retain(|node| matches!(node, Node::Leaf(_)))
+        self.nodes.retain(|node| matches!(node, Node::Leaf(_)));
         self.rehash_inner_nodes(&self.nodes.clone());
     }
 
@@ -271,8 +417,8 @@ impl IndexedMerkleTree {
     /// # Returns
     ///
     /// The current commitment (hash of the root node) of the Indexed Merkle tree.
-    pub fn get_commitment(&self) -> Result<String, MerkleTreeError> {
-        Ok(self.get_root()?.get_hash().to_string())
+    pub fn get_commitment(&self) -> Result<[u8; 32], MerkleTreeError> {
+        Ok(self.get_root()?.get_hash())
     }
 
     /// Finds the index of a specific node in the indexed Merkle Tree.
@@ -320,7 +466,7 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     /// An `Option<Node>` representing the found leaf node, if any.
-    pub fn find_leaf_by_label(&self, label: &String) -> Option<Node> {
+    pub fn find_leaf_by_label(&self, label: &[u8; 32]) -> Option<Node> {
         self.nodes.iter().find_map(|node| match node {
             Node::Leaf(leaf) => {
                 if &leaf.label == label {
@@ -364,7 +510,7 @@ impl IndexedMerkleTree {
             return Err(MerkleTreeError::IndexError(index.to_string()));
         }
 
-        let mut proof_path: Vec<Node> = vec![];
+        let mut proof_path: Vec<Node> = Vec::new();
         let mut current_index = index;
 
         let leaf_node = self.nodes[current_index].clone();
@@ -417,21 +563,11 @@ impl IndexedMerkleTree {
         let mut found_index = None;
         for (index, current_node) in self.nodes.iter().enumerate() {
             if let Node::Leaf(current_leaf) = current_node {
-                let current_label = BigInt::from_str_radix(&current_leaf.label, 16);
-                let current_next = BigInt::from_str_radix(&current_leaf.next, 16);
-                let new_label = BigInt::from_str_radix(&given_node_as_leaf.label, 16);
-
-                if let (Ok(current_label), Ok(current_next), Ok(new_label)) =
-                    (current_label, current_next, new_label)
+                if &current_leaf.label < &given_node_as_leaf.label
+                    && given_node_as_leaf.label < current_leaf.next
                 {
-                    if current_label < new_label && new_label < current_next {
-                        found_index = Some(index);
-                        break;
-                    }
-                } else {
-                    return Err(MerkleTreeError::InvalidFormatError(format!(
-                        "BigInt from label or next pointer"
-                    )));
+                    found_index = Some(index);
+                    break;
                 }
             }
         }
@@ -505,7 +641,8 @@ impl IndexedMerkleTree {
         let mut new_old_node = self.nodes[non_membership_proof.closest_index].clone();
         Node::update_next_pointer(&mut new_old_node, new_node);
         new_old_node.generate_hash();
-        let first_proof = self.update_node(non_membership_proof.closest_index, new_old_node.clone())?;
+        let first_proof =
+            self.update_node(non_membership_proof.closest_index, new_old_node.clone())?;
 
         // we checked if the found index in the non-membership is from an incative node, if not we have to search for another inactive node to update and if we cant find one, we have to double the tree
         let mut new_index = None;
@@ -553,6 +690,7 @@ impl IndexedMerkleTree {
 ///
 /// # Returns
 /// A `Vec<Node>` with updated left sibling status for each node.
+#[cfg(feature = "std")]
 pub fn set_left_sibling_status_for_nodes(nodes: Vec<Node>) -> Vec<Node> {
     let new: Vec<Node> = nodes
         .into_iter()
@@ -577,6 +715,7 @@ pub fn set_left_sibling_status_for_nodes(nodes: Vec<Node>) -> Vec<Node> {
 ///
 /// # Returns
 /// A `Result<Vec<Node>, MerkleTreeError>` representing the sorted nodes or an error.
+#[cfg(feature = "std")]
 pub fn resort_nodes_by_input_order(
     nodes: Vec<Node>,
     input_order: Vec<String>,
@@ -594,7 +733,12 @@ pub fn resort_nodes_by_input_order(
             label.and_then(|l| {
                 input_order
                     .iter()
-                    .position(|k| k == &l)
+                    .position(|k| {
+                        // TODO: remove unwrap
+                        let mut bytes = [0u8; 32];
+                        hex::decode_to_slice(k, &mut bytes).unwrap();
+                        bytes == l
+                    })
                     .map(|index| (index, node))
             })
         })
@@ -607,6 +751,7 @@ pub fn resort_nodes_by_input_order(
     Ok(sorted_nodes)
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,8 +1,13 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 pub mod error;
 pub mod node;
 pub mod tree;
 
-use crypto_hash::{hex_digest, Algorithm};
+extern crate alloc;
+
+use sha2::{Digest, Sha256};
+
+use alloc::vec::Vec;
 
 /// Computes the SHA256 hash of the given string.
 ///
@@ -14,6 +19,20 @@ use crypto_hash::{hex_digest, Algorithm};
 ///
 /// # Returns
 /// A `String` representing the hexadecimal SHA256 hash of the input.
-pub fn sha256(input: &str) -> String {
-    hex_digest(Algorithm::SHA256, input.as_bytes())
+pub fn sha256(input: impl AsRef<[u8]>) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(input);
+    let result = hasher.finalize();
+    Into::<[u8; 32]>::into(result)
+}
+
+pub fn concat_slices(slices: Vec<&[u8]>) -> Vec<u8> {
+    let total_length: usize = slices.iter().map(|s| s.len()).sum();
+    let mut combined = Vec::with_capacity(total_length);
+
+    for slice in slices {
+        combined.extend_from_slice(slice);
+    }
+
+    combined
 }

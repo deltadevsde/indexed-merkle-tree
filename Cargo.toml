@@ -1,8 +1,11 @@
 [package]
 name = "indexed-merkle-tree"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-authors = ["Ryan Ford <ryan@deltadevs.xyz>", "Sebastian Pusch <sebastian@deltadevs.xyz>"]
+authors = [
+    "Ryan Ford <ryan@deltadevs.xyz>",
+    "Sebastian Pusch <sebastian@deltadevs.xyz>",
+]
 description = "This crate provides an implementation of Indexed Merkle Trees, a version of Merkle trees that supports both membership and non-membership proofs."
 homepage = "https://github.com/deltadevsde/indexed-merkle-tree"
 repository = "https://github.com/deltadevsde/indexed-merkle-tree"
@@ -10,10 +13,18 @@ license = "MIT"
 keywords = ["crypto", "merkle-tree", "membership", "non-membership"]
 readme = "README.md"
 
+[features]
+default = []
+std = ["thiserror/std", "serde/std", "serde/rc"]
+
 [dependencies]
-crypto-hash = "0.3.4"
-num = "0.4.0"
-serde = { version = "1.0.151", features = ["derive", "rc"] }
-thiserror = "1.0.50"
-serde_json = "1.0.79"
-cargo-audit = "0.20.0"
+serde = { version = "1.0.151", default-features = false, features = [
+    "derive",
+    "alloc",
+] }
+thiserror = { version = "1.0", package = "thiserror-core", default-features = false }
+serde_json = { version = "1.0.117", default-features = false, features = [
+    "alloc",
+] }
+sha2 = { version = "0.10", default-features = false }
+hex = { version = "0.4.3", default-features = false }
