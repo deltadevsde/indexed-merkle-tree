@@ -4,14 +4,18 @@ use serde::{Deserialize, Serialize};
 extern crate alloc;
 
 use crate::{
-    node::{create_zk_node, LeafNode, Node, ZkNode},
+    node::{LeafNode, ZkNode},
     sha256,
 };
 
 #[cfg(feature = "std")]
-use {crate::error::MerkleTreeError, crate::node::InnerNode};
+use {
+    crate::error::MerkleTreeError,
+    crate::node::{InnerNode, Node},
+};
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MerkleProof {
     // Root hash of the Merkle Tree.
@@ -30,6 +34,7 @@ pub struct ZkMerkleProof {
 
 // `NonMembershipProof` contains the `MerkleProof` of the node where the returned `missing_node: LeafNode` would be found.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg(feature = "std")]
 pub struct NonMembershipProof {
     // Merkle proof of the node that `missing_node` would be found between `label` and `next`.
     pub merkle_proof: MerkleProof,
@@ -47,6 +52,7 @@ pub struct ZkNonMembershipProof {
 }
 
 // `UpdateProof` contains the old `MerkleProof` and the new `MerkleProof` after the update operation
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UpdateProof {
     // Merkle proof before the update.
@@ -62,6 +68,7 @@ pub struct ZkUpdateProof {
 
 // `InsertProof` contains the non-membership proof of the new `Node` (to guarantee uniqueness), and two `UpdateProof`s.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg(feature = "std")]
 pub struct InsertProof {
     // Non-membership proof of the new node.
     pub non_membership_proof: NonMembershipProof,
@@ -77,6 +84,7 @@ pub struct ZkInsertProof {
     pub second_proof: ZkUpdateProof,
 }
 
+#[cfg(feature = "std")]
 impl NonMembershipProof {
     /// Verifies the non-membership proof of a node in the indexed Merkle Tree.
     ///
@@ -98,6 +106,7 @@ impl NonMembershipProof {
     }
 }
 
+#[cfg(feature = "std")]
 impl InsertProof {
     /// Verifies the proofs associated with a node insertion in the indexed Merkle Tree.
     ///
@@ -114,6 +123,7 @@ impl InsertProof {
     }
 }
 
+#[cfg(feature = "std")]
 impl UpdateProof {
     /// Verifies an update proof in the indexed Merkle Tree.
     ///
@@ -127,6 +137,7 @@ impl UpdateProof {
     }
 }
 
+#[cfg(feature = "std")]
 impl MerkleProof {
     /// Verifies a Merkle proof against a given root hash.
     ///
@@ -168,6 +179,7 @@ impl MerkleProof {
 /// - `Update(UpdateProof)`: Represents a proof for an update operation.
 /// - `Insert(InsertProof)`: Represents a proof for an insert operation.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg(feature = "std")]
 pub enum Proof {
     Update(UpdateProof),
     Insert(InsertProof),
@@ -179,6 +191,7 @@ pub enum ZkProof {
     Insert(ZkInsertProof),
 }
 
+#[cfg(feature = "std")]
 impl Proof {
     pub fn prepare_for_snark(&self) -> ZkProof {
         match self {
@@ -189,7 +202,7 @@ impl Proof {
                         .old_proof
                         .path
                         .iter()
-                        .map(|n| create_zk_node(n))
+                        .map(|n| n.create_zk_node())
                         .collect(),
                 },
                 new_proof: ZkMerkleProof {
@@ -198,7 +211,7 @@ impl Proof {
                         .new_proof
                         .path
                         .iter()
-                        .map(|n| create_zk_node(n))
+                        .map(|n| n.create_zk_node())
                         .collect(),
                 },
             }),
@@ -212,7 +225,7 @@ impl Proof {
                             .merkle_proof
                             .path
                             .iter()
-                            .map(|n| create_zk_node(n))
+                            .map(|n| n.create_zk_node())
                             .collect(),
                     },
                     closest_index: insert_proof.non_membership_proof.closest_index,
@@ -226,7 +239,7 @@ impl Proof {
                             .old_proof
                             .path
                             .iter()
-                            .map(|n| create_zk_node(n))
+                            .map(|n| n.create_zk_node())
                             .collect(),
                     },
                     new_proof: ZkMerkleProof {
@@ -236,7 +249,7 @@ impl Proof {
                             .new_proof
                             .path
                             .iter()
-                            .map(|n| create_zk_node(n))
+                            .map(|n| n.create_zk_node())
                             .collect(),
                     },
                 },
@@ -248,7 +261,7 @@ impl Proof {
                             .old_proof
                             .path
                             .iter()
-                            .map(|n| create_zk_node(n))
+                            .map(|n| n.create_zk_node())
                             .collect(),
                     },
                     new_proof: ZkMerkleProof {
@@ -258,7 +271,7 @@ impl Proof {
                             .new_proof
                             .path
                             .iter()
-                            .map(|n| create_zk_node(n))
+                            .map(|n| n.create_zk_node())
                             .collect(),
                     },
                 },

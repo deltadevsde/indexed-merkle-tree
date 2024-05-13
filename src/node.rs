@@ -65,6 +65,13 @@ impl InnerNode {
     }
 }
 
+trait ZkNodeCreator {
+    fn get_hash(&self) -> [u8; 32];
+    fn is_left_sibling(&self) -> bool;
+    fn get_left_hash(&self) -> [u8; 32];
+    fn get_right_hash(&self) -> [u8; 32];
+}
+
 impl ZkInnerNode {
     pub fn new(left: [u8; 32], right: [u8; 32], index: usize) -> Self {
         let mut combined = Vec::new();
@@ -168,6 +175,7 @@ impl Default for LeafNode {
 /// Variants:
 /// - `Inner(InnerNode)`: An inner node of the tree, containing references to child nodes.
 /// - `Leaf(LeafNode)`: A leaf node, containing the actual data (hash of its metadata).
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Node {
     Inner(InnerNode),
@@ -180,12 +188,14 @@ pub enum ZkNode {
     Leaf(LeafNode),
 }
 
+#[cfg(feature = "std")]
 impl Default for Node {
     fn default() -> Self {
         Node::Leaf(LeafNode::default())
     }
 }
 
+#[cfg(feature = "std")]
 impl Node {
     /// A placeholder for label/value values in inactive (empty) leaf nodes in the indexed Merkle Tree.
     /// It's also the fixed label of the first element in the indexed Merkle tree, because it's the
@@ -214,7 +224,7 @@ impl Node {
         #[cfg(feature = "std")]
         return Node::Inner(InnerNode::new(left, right, index));
         #[cfg(not(feature = "std"))]
-        return Node::Inner(InnerNode::new(left.get_hash(), right.get_hash(), index));
+        return Node::Inner(ZkInnerNode::new(left.get_hash(), right.get_hash(), index));
     }
 
     /// Returns the hash of the node.
@@ -343,17 +353,17 @@ impl Node {
             }
         }
     }
-}
 
-pub fn create_zk_node(node: &Node) -> ZkNode {
-    match node {
-        Node::Inner(inner) => ZkNode::Inner(ZkInnerNode {
-            hash: inner.hash,
-            is_left_sibling: inner.is_left_sibling,
-            left: inner.left.get_hash(),
-            right: inner.right.get_hash(),
-        }),
-        Node::Leaf(leaf) => ZkNode::Leaf(leaf.clone()),
+    pub fn create_zk_node(&self) -> ZkNode {
+        match self {
+            Node::Inner(inner) => ZkNode::Inner(ZkInnerNode {
+                hash: inner.hash,
+                is_left_sibling: inner.is_left_sibling,
+                left: inner.left.get_hash(),
+                right: inner.right.get_hash(),
+            }),
+            Node::Leaf(leaf) => ZkNode::Leaf(leaf.clone()),
+        }
     }
 }
 
@@ -381,7 +391,7 @@ impl ZkNode {
 
     /// Convenience method for creating a new inner node.
     /// See `InnerNode::new` for more information.
-    pub fn new_inner(left: Node, right: Node, index: usize) -> Self {
+    pub fn new_inner(left: ZkNode, right: ZkNode, index: usize) -> Self {
         return ZkNode::Inner(ZkInnerNode::new(left.get_hash(), right.get_hash(), index));
     }
 
@@ -454,63 +464,6 @@ impl ZkNode {
         if let Self::Leaf(ref mut existing_leaf) = existing_node {
             if let Self::Leaf(new_leaf) = new_node {
                 existing_leaf.next = new_leaf.label.clone();
-            }
-        }
-    }
-}
-
-#[cfg(not(feature = "std"))]
-impl Node {
-    /// Attaches a node as the left child of an inner node.
-    ///
-    /// This function sets the provided node as the left child of the current inner node.
-    ///
-    /// # Arguments
-    /// * `left` - An `Arc<Self>` pointing to the node to be set as the left child.
-    pub fn add_left(&mut self, left: [u8; 32]) {
-        if let Node::Inner(inner) = self {
-            inner.left = left;
-        }
-    }
-
-    /// Attaches a node as the right child of an inner node.
-    ///
-    /// This function sets the provided node as the right child of the current inner node.
-    ///
-    /// # Arguments
-    /// * `right` - An `Arc<Self>` pointing to the node to be set as the right child.
-    pub fn add_right(&mut self, right: [u8; 32]) {
-        if let Node::Inner(inner) = self {
-            inner.right = right;
-        }
-    }
-
-    /// Generates and updates the hash for the node.
-    ///
-    /// @todo: Deprecate this function by creating proper constructors for the nodes
-    ///
-    /// This function computes the hash of a node based on its type and properties.
-    /// For an inner node, the hash is generated from the concatenated hashes of its left and right children in form of:
-    ///     SHA256(left_child_hash || right_child_hash)
-    /// For a leaf node, the hash is based on its active status, label, value, and the reference to the next node in the tree:
-    ///     SHA256(active || label || value || next)
-    pub fn generate_hash(&mut self) {
-        match self {
-            Node::Inner(node) => {
-                let mut combined = Vec::new();
-                combined.extend_from_slice(&node.left);
-                combined.extend_from_slice(&node.right);
-
-                node.hash = sha256(&combined);
-            }
-            Node::Leaf(leaf) => {
-                let mut combined = Vec::new();
-                combined.push(leaf.active as u8);
-                combined.extend_from_slice(&leaf.label);
-                combined.extend_from_slice(&leaf.value);
-                combined.extend_from_slice(&leaf.next);
-
-                leaf.hash = sha256(&combined);
             }
         }
     }
