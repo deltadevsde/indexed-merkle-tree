@@ -3,7 +3,9 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::{concat_slices, sha256};
+#[cfg(feature = "std")]
+use crate::concat_slices;
+use crate::sha256;
 
 /// Represents an inner node in the indexed Merkle Tree.
 ///
@@ -16,17 +18,26 @@ use crate::{concat_slices, sha256};
 /// - `is_left_sibling`: Indicates whether this node is a left child of its parent.
 /// - `left`: A reference-counted pointer to the left child node.
 /// - `right`: A reference-counted pointer to the right child node.
+#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InnerNode {
     pub hash: [u8; 32],
     pub is_left_sibling: bool,
-    #[cfg(feature = "std")]
     pub left: Arc<Node>,
     #[cfg(feature = "std")]
     pub right: Arc<Node>,
     #[cfg(not(feature = "std"))]
     pub left: [u8; 32],
     #[cfg(not(feature = "std"))]
+    pub right: [u8; 32],
+}
+
+#[cfg(not(feature = "std"))]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InnerNode {
+    pub hash: [u8; 32],
+    pub is_left_sibling: bool,
+    pub left: [u8; 32],
     pub right: [u8; 32],
 }
 
