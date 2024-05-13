@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 extern crate alloc;

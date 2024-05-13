@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::sha256;
+use crate::{concat_slices, sha256};
 
 /// Represents an inner node in the indexed Merkle Tree.
 ///
