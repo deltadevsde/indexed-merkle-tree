@@ -348,8 +348,6 @@ impl Node {
             Node::Inner(inner) => ZkNode::Inner(ZkInnerNode {
                 hash: inner.hash,
                 is_left_sibling: inner.is_left_sibling,
-                left: inner.left.get_hash(),
-                right: inner.right.get_hash(),
             }),
             Node::Leaf(leaf) => ZkNode::Leaf(leaf.clone()),
         }
