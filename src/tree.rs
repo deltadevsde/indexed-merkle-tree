@@ -1,10 +1,12 @@
-use crate::Sha256Hash;
 use alloc::{string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
 
 extern crate alloc;
 
-use crate::node::{LeafNode, Node};
+use crate::{
+    node::{LeafNode, Node},
+    sha256,
+};
 
 #[cfg(feature = "std")]
 use {crate::error::MerkleTreeError, crate::node::InnerNode};
@@ -143,7 +145,7 @@ impl MerkleProof {
                         combined.extend_from_slice(&node.get_hash());
                         combined
                     };
-                    current_hash = Sha256Hash::new(&hash).as_bytes();
+                    current_hash = sha256(&hash);
                 }
                 return &current_hash == root;
             }

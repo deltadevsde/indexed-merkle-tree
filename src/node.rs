@@ -1,8 +1,9 @@
-use crate::Sha256Hash;
 #[cfg(feature = "std")]
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
+
+use crate::sha256;
 
 /// Represents an inner node in the indexed Merkle Tree.
 ///
@@ -61,7 +62,7 @@ impl InnerNode {
         combined.extend_from_slice(&left);
         combined.extend_from_slice(&right);
         InnerNode {
-            hash: Sha256Hash::new(&combined).as_bytes(),
+            hash: sha256(&combined),
             is_left_sibling: index % 2 == 0,
             left,
             right,
@@ -124,7 +125,7 @@ impl LeafNode {
         combined.extend_from_slice(&next);
 
         LeafNode {
-            hash: Sha256Hash::new(&combined).as_bytes(),
+            hash: sha256(&combined),
             is_left_sibling: is_left,
             active,
             value,
@@ -390,7 +391,7 @@ impl Node {
                 combined.extend_from_slice(&node.left);
                 combined.extend_from_slice(&node.right);
 
-                node.hash = Sha256Hash::new(&combined).as_bytes();
+                node.hash = sha256(&combined);
             }
             Node::Leaf(leaf) => {
                 let mut combined = Vec::new();
@@ -399,7 +400,7 @@ impl Node {
                 combined.extend_from_slice(&leaf.value);
                 combined.extend_from_slice(&leaf.next);
 
-                leaf.hash = Sha256Hash::new(&combined).as_bytes();
+                leaf.hash = sha256(&combined);
             }
         }
     }
