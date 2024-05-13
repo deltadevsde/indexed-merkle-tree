@@ -1,4 +1,4 @@
-use crate::{concat_slices, sha256};
+use crate::Sha256Hash;
 use alloc::{string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
 
@@ -17,11 +17,6 @@ pub struct MerkleProof {
     // Path from the leaf to the root.
     pub path: Vec<Node>,
 }
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ZkMerkleProof {
-    pub root_hash: [u8; 32],
-    pub path: Vec<[u8; 32]>,
-}
 
 // `NonMembershipProof` contains the `MerkleProof` of the node where the returned `missing_node: LeafNode` would be found.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -36,7 +31,7 @@ pub struct NonMembershipProof {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ZkNonMembershipProof {
     pub node_to_prove: LeafNode,
-    pub merkle_proof: ZkMerkleProof,
+    pub merkle_proof: MerkleProof,
     pub closest_index: usize,
     pub missing_node: [u8; 32],
 }
@@ -51,8 +46,8 @@ pub struct UpdateProof {
 }
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ZkUpdateProof {
-    pub old_proof: ZkMerkleProof,
-    pub new_proof: ZkMerkleProof,
+    pub old_proof: MerkleProof,
+    pub new_proof: MerkleProof,
 }
 
 // `InsertProof` contains the non-membership proof of the new `Node` (to guarantee uniqueness), and two `UpdateProof`s.
@@ -148,7 +143,7 @@ impl MerkleProof {
                         combined.extend_from_slice(&node.get_hash());
                         combined
                     };
-                    current_hash = sha256(&hash);
+                    current_hash = Sha256Hash::new(&hash).as_bytes();
                 }
                 return &current_hash == root;
             }
@@ -174,7 +169,7 @@ pub enum ZkProof {
     Insert(ZkInsertProof),
 }
 
-impl Proof {
+/* impl Proof {
     pub fn prepare_for_snark(&self) -> ZkProof {
         match self {
             Proof::Update(update_proof) => ZkProof::Update(ZkUpdateProof {
@@ -269,7 +264,7 @@ impl Proof {
         }
     }
 }
-
+ */
 /// Represents an indexed merkle tree.
 ///
 /// This structure encapsulates a merkle tree where `Node`s are indexed, facilitating efficient

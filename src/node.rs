@@ -1,4 +1,5 @@
-use crate::{concat_slices, sha256};
+use crate::Sha256Hash;
+#[cfg(feature = "std")]
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
@@ -60,7 +61,7 @@ impl InnerNode {
         combined.extend_from_slice(&left);
         combined.extend_from_slice(&right);
         InnerNode {
-            hash: sha256(&combined),
+            hash: Sha256Hash::new(&combined).as_bytes(),
             is_left_sibling: index % 2 == 0,
             left,
             right,
@@ -123,7 +124,7 @@ impl LeafNode {
         combined.extend_from_slice(&next);
 
         LeafNode {
-            hash: sha256(&combined),
+            hash: Sha256Hash::new(&combined).as_bytes(),
             is_left_sibling: is_left,
             active,
             value,
@@ -389,7 +390,7 @@ impl Node {
                 combined.extend_from_slice(&node.left);
                 combined.extend_from_slice(&node.right);
 
-                node.hash = sha256(&combined);
+                node.hash = Sha256Hash::new(&combined).as_bytes();
             }
             Node::Leaf(leaf) => {
                 let mut combined = Vec::new();
@@ -398,7 +399,7 @@ impl Node {
                 combined.extend_from_slice(&leaf.value);
                 combined.extend_from_slice(&leaf.next);
 
-                leaf.hash = sha256(&combined);
+                leaf.hash = Sha256Hash::new(&combined).as_bytes();
             }
         }
     }
