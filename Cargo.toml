@@ -14,7 +14,7 @@ keywords = ["crypto", "merkle-tree", "membership", "non-membership"]
 readme = "README.md"
 
 [features]
-default = ["std"]
+default = []
 std = ["thiserror/std", "serde/std", "serde/rc"]
 
 [dependencies]
