@@ -36,8 +36,6 @@ pub struct InnerNode {
 pub struct ZkInnerNode {
     pub hash: [u8; 32],
     pub is_left_sibling: bool,
-    pub left: [u8; 32],
-    pub right: [u8; 32],
 }
 
 #[cfg(feature = "std")]
@@ -65,13 +63,6 @@ impl InnerNode {
     }
 }
 
-trait ZkNodeCreator {
-    fn get_hash(&self) -> [u8; 32];
-    fn is_left_sibling(&self) -> bool;
-    fn get_left_hash(&self) -> [u8; 32];
-    fn get_right_hash(&self) -> [u8; 32];
-}
-
 impl ZkInnerNode {
     pub fn new(left: [u8; 32], right: [u8; 32], index: usize) -> Self {
         let mut combined = Vec::new();
@@ -80,8 +71,6 @@ impl ZkInnerNode {
         ZkInnerNode {
             hash: sha256(&combined),
             is_left_sibling: index % 2 == 0,
-            left,
-            right,
         }
     }
 }
