@@ -2,14 +2,14 @@ use num::{BigInt, Num};
 use serde::{Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
-use crate::node::{self, InnerNode, LeafNode, Node};
+use crate::node::{InnerNode, LeafNode, Node};
 use crate::sha256;
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MerkleProof {
     // Root hash of the Merkle Tree.
-    pub root_hash: String,
+    pub root_hash: String, // should be [u8; 32]
     // Path from the leaf to the root.
     pub path: Vec<Node>,
 }
@@ -437,7 +437,7 @@ impl IndexedMerkleTree {
         }
 
         match found_index {
-            Some(index) => Ok(NonMembershipProof {
+            Some(_) => Ok(NonMembershipProof {
                 merkle_proof: self.generate_membership_proof(found_index.unwrap())?,
                 closest_index: found_index.unwrap(),
                 missing_node: given_node_as_leaf.clone(),
