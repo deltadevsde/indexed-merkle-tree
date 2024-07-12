@@ -457,7 +457,7 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     /// A `Result<(MerkleProof, UpdateProof, UpdateProof), MerkleTreeError>` containing the non-membership proof and two update proofs.
-    pub fn insert_node(&mut self, new_node: &Node) -> Result<InsertProof, MerkleTreeError> {
+    pub fn insert_node(&mut self, new_node: &mut Node) -> Result<InsertProof, MerkleTreeError> {
         // perform non-membership check in order to return the index of the node to be changed
         let (non_membership_proof, old_index) = self.generate_non_membership_proof(new_node)?;
 
@@ -470,11 +470,22 @@ impl IndexedMerkleTree {
 
         // generate first update proof, changing only the next pointer from the old node
         let mut new_old_node = self.nodes[old_index].clone();
+
+        let old_next_label = new_old_node.get_next();
+        new_node.set_next(old_next_label.clone());
+        new_node.generate_hash();
+
+        // Set the sibling value based on the index
+        let is_left_sibling = old_index % 2 == 0;
+        new_old_node.set_left_sibling_value(is_left_sibling);
+
         Node::update_next_pointer(&mut new_old_node, new_node);
         new_old_node.generate_hash();
         let first_proof = self.update_node(old_index, new_old_node.clone())?;
 
-        // we checked if the found index in the non-membership is from an incative node, if not we have to search for another inactive node to update and if we cant find one, we have to double the tree
+        // we checked if the found index in the non-membership is from an inactive node,
+        // if not we have to search for another inactive node to update and if we can't find one,
+        // we have to double the tree
         let mut new_index = None;
         for (i, node) in self.nodes.iter().enumerate() {
             if !node.is_active() {
@@ -497,6 +508,11 @@ impl IndexedMerkleTree {
                     .expect("New inactive node not found after doubling the tree.")
             }
         };
+
+        // Set the sibling value for the new node based on the new index
+        let is_left_sibling = new_index % 2 == 0;
+        new_node.set_left_sibling_value(is_left_sibling);
+        new_node.generate_hash();
 
         // generate second update proof
         let second_proof = self.update_node(new_index, new_node.clone())?;

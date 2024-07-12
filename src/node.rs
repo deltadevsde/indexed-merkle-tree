@@ -199,6 +199,28 @@ impl Node {
         }
     }
 
+    /// Returns the `next` node identifier.
+    ///
+    /// This function retrieves the `next` node identifier for a leaf node, or returns the `TAIL` identifier
+    /// if the node is not a leaf. This is useful for traversing linked lists of leaf nodes.
+    pub fn get_next(&self) -> String {
+        match self {
+            Node::Leaf(leaf) => leaf.next.clone(),
+            _ => Node::TAIL.to_string(),
+        }
+    }
+
+    /// Sets the `next` node identifier.
+    ///
+    /// This function sets the `next` node identifier for a leaf node. This is important for maintaining
+    /// the linked list structure of leaf nodes within the tree, enabling efficient traversal and modifications.
+    pub fn set_next(&mut self, next: String) {
+        match self {
+            Node::Leaf(leaf) => leaf.next = next,
+            _ => (),
+        }
+    }
+
     /// Sets the left sibling status of the node.
     ///
     /// This function updates whether the node (inner or leaf) is considered a left sibling.
