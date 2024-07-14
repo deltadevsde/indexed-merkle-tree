@@ -1609,7 +1609,7 @@ checksum = "ce23b50ad8242c51a442f3ff322d56b02f08852c77e4c0b4d3fd684abc89c683"
 
 [[package]]
 name = "indexed-merkle-tree"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "cargo-audit",
  "crypto-hash",

@@ -493,7 +493,7 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     /// A `Result<(MerkleProof, UpdateProof, UpdateProof), MerkleTreeError>` containing the non-membership proof and two update proofs.
-    pub fn insert_node(&mut self, new_node: &Node) -> Result<InsertProof, MerkleTreeError> {
+    pub fn insert_node(&mut self, new_node: &mut Node) -> Result<InsertProof, MerkleTreeError> {
         // perform non-membership check in order to return the index of the node to be changed
         let non_membership_proof = self.generate_non_membership_proof(new_node)?;
 
@@ -503,6 +503,10 @@ impl IndexedMerkleTree {
 
         // generate first update proof, changing only the next pointer from the old node
         let mut new_old_node = self.nodes[non_membership_proof.closest_index].clone();
+
+        // set the next pointer of the new node to the next pointer of the old node
+        new_node.set_next(new_old_node.get_next());
+
         Node::update_next_pointer(&mut new_old_node, new_node);
         new_old_node.generate_hash();
         let first_proof =
@@ -531,6 +535,10 @@ impl IndexedMerkleTree {
                     .expect("New inactive node not found after doubling the tree.")
             }
         };
+
+        // set the sibling status of the new node
+        new_node.set_left_sibling_value(new_index % 2 == 0);
+        new_node.generate_hash();
 
         // generate second update proof
         let second_proof = self.update_node(new_index, new_node.clone())?;
