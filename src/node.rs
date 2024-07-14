@@ -88,7 +88,7 @@ impl LeafNode {
     /// # Returns
     /// * A new leaf node with the specified properties.
     pub fn new(active: bool, is_left: bool, label: String, value: String, next: String) -> Self {
-        let hash = format!("{}, {}, {}, {}", active, label, value, next);
+        let hash = format!("{}{}{}{}", active, label, value, next);
         LeafNode {
             hash: sha256(&hash),
             is_left_sibling: is_left,

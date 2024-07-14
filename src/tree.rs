@@ -55,10 +55,10 @@ impl NonMembershipProof {
     /// `true` if the proof is valid and the node is not present, `false` otherwise.
     pub fn verify(&self) -> bool {
         if let Some(Node::Leaf(leaf)) = self.merkle_proof.path.first() {
-            if self.merkle_proof.verify()
-                && self.missing_node.label < leaf.label
-                && self.missing_node.label < leaf.next
-            {
+            let current_label = BigInt::from_str_radix(&leaf.label, 16).unwrap();
+            let current_next = BigInt::from_str_radix(&leaf.next, 16).unwrap();
+            let new_label = BigInt::from_str_radix(&self.missing_node.label, 16).unwrap();
+            if self.merkle_proof.verify() && new_label > current_label && new_label < current_next {
                 return true;
             }
         }
@@ -403,7 +403,7 @@ impl IndexedMerkleTree {
     /// * `node` - A reference to the `Node` for which the non-membership proof is required.
     ///
     /// # Returns
-    /// A `Result<(MerkleProof, Option<usize>), MerkleTreeError>` containing the non-membership proof and
+    /// A `Result<NonMembershipProof, MerkleTreeError>` containing the non-membership proof and
     /// the index of the "closest" valid node, or an error.
     pub fn generate_non_membership_proof(
         &self,
