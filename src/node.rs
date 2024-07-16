@@ -221,6 +221,18 @@ impl Node {
         }
     }
 
+    /// Returns the `label` of the node.
+    ///
+    /// This function retrieves the `label` for a leaf node, or returns the `EMPTY_HASH` identifier
+    /// if the node is not a leaf. This is useful for accessing the label of leaf nodes within the tree,
+    /// which may represent some data or key associated with that node.
+    pub fn get_label(&self) -> String {
+        match self {
+            Node::Leaf(leaf) => leaf.label.clone(),
+            _ => Node::EMPTY_HASH.to_string(),
+        }
+    }
+
     /// Sets the left sibling status of the node.
     ///
     /// This function updates whether the node (inner or leaf) is considered a left sibling.
