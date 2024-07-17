@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
 use crate::node::{InnerNode, LeafNode, Node};
-use crate::sha256;
+use crate::sha256_mod;
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -116,9 +116,9 @@ impl MerkleProof {
                     } else {
                         format!("{}{}", current_hash, node.get_hash())
                     };
-                    current_hash = sha256(&hash);
+                    current_hash = sha256_mod(&hash);
                 }
-                return &current_hash == root;
+                &current_hash == root
             }
             _ => false,
         }
@@ -176,7 +176,7 @@ impl IndexedMerkleTree {
     /// A `Result<Self, MerkleTreeError>` representing the initialized tree or an error.
     pub fn new_with_size(size: usize) -> Result<Self, MerkleTreeError> {
         let mut nodes: Vec<Node> = Vec::with_capacity(2 * size + 1);
-        let empty_hash = Node::EMPTY_HASH.to_string();
+        let empty_hash = Node::HEAD.to_string();
         let tail = Node::TAIL.to_string();
 
         let active_node = Node::new_leaf(
@@ -211,7 +211,7 @@ impl IndexedMerkleTree {
     ///
     /// When called, this function expects the passed nodes to be leaf nodes.
     /// It assumes these are the only nodes present in `self.nodes`.
-    fn rehash_inner_nodes(&mut self, current_layer: &Vec<Node>) {
+    fn rehash_inner_nodes(&mut self, current_layer: &[Node]) {
         for (index, node) in current_layer.chunks(2).enumerate() {
             let new_node = Node::Inner(InnerNode::new(node[0].clone(), node[1].clone(), index));
             self.nodes.push(new_node);
@@ -411,7 +411,7 @@ impl IndexedMerkleTree {
     ) -> Result<NonMembershipProof, MerkleTreeError> {
         let given_node_as_leaf = match node {
             Node::Leaf(leaf) => leaf,
-            _ => return Err(MerkleTreeError::NotFoundError(format!("Leaf"))),
+            _ => return Err(MerkleTreeError::NotFoundError("Leaf".to_string())),
         };
 
         let mut found_index = None;
@@ -429,9 +429,9 @@ impl IndexedMerkleTree {
                         break;
                     }
                 } else {
-                    return Err(MerkleTreeError::InvalidFormatError(format!(
-                        "BigInt from label or next pointer"
-                    )));
+                    return Err(MerkleTreeError::InvalidFormatError(
+                        "BigInt from label or next pointer".to_string(),
+                    ));
                 }
             }
         }

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::sha256;
+use crate::sha256_mod;
 
 /// Represents an inner node in the indexed Merkle Tree.
 ///
@@ -38,7 +38,7 @@ impl InnerNode {
     /// An `InnerNode` representing the newly created inner node.
     pub fn new(left: Node, right: Node, index: usize) -> Self {
         InnerNode {
-            hash: sha256(&format!("{}{}", left.get_hash(), right.get_hash())),
+            hash: sha256_mod(&format!("{}{}", left.get_hash(), right.get_hash())),
             is_left_sibling: index % 2 == 0,
             left: Arc::new(left),
             right: Arc::new(right),
@@ -90,7 +90,7 @@ impl LeafNode {
     pub fn new(active: bool, is_left: bool, label: String, value: String, next: String) -> Self {
         let hash = format!("{}{}{}{}", active, label, value, next);
         LeafNode {
-            hash: sha256(&hash),
+            hash: sha256_mod(&hash),
             is_left_sibling: is_left,
             active,
             value,
@@ -106,8 +106,8 @@ impl Default for LeafNode {
             false,
             // default leaf nodes are not left siblings
             false,
-            Node::EMPTY_HASH.to_string(),
-            Node::EMPTY_HASH.to_string(),
+            Node::HEAD.to_string(),
+            Node::HEAD.to_string(),
             Node::TAIL.to_string(),
         )
     }
@@ -136,16 +136,36 @@ impl Default for Node {
 }
 
 impl Node {
-    /// A placeholder for label/value values in inactive (empty) leaf nodes in the indexed Merkle Tree.
-    /// It's also the fixed label of the first element in the indexed Merkle tree, because it's the
-    /// lowest possible number in with 256 output bits from sha256.
-    pub const EMPTY_HASH: &'static str =
+    /// This constant represents the smallest possible value in the field Fp for the BLS12-381 curve.
+    ///
+    /// In the context of a Merkle tree with 256-bit SHA-256 hash outputs, this value is used to designate
+    /// the first element or a null value. This is because the smallest possible value that can be generated
+    /// by SHA-256 is zero, which is also the smallest value in the field Fp for the BLS12-381 curve.
+    ///
+    /// The value `HEAD` is used in the following ways:
+    /// - As the starting point or initial value in the Merkle tree.
+    /// - As a placeholder for empty or null nodes.
+    pub const HEAD: &'static str =
         "0000000000000000000000000000000000000000000000000000000000000000";
 
-    /// This constant is used to designate the last element (because it's the highest possible number in with 256 output bits from sha256)
-    /// in the indexed Merkle tree. The next pointer from the largest label in the current tree, as well as the next pointer from inactive leaf nodes "point" to it.
+    /// This constant represents the largest possible value in the field Fp for the BLS12-381 curve.
+    ///
+    /// In the context of a Merkle tree with 256-bit SHA-256 hash outputs, this value is used to designate
+    /// the last element. This is because we need to ensure that all values are within the field Fp for the
+    /// BLS12-381 curve, and the largest possible value that we can use is just below the modulus.
+    ///
+    /// The value `TAIL` is used in the following ways:
+    /// - As the next pointer from the largest label in the current Merkle tree.
+    /// - As the next pointer from inactive leaf nodes, effectively "pointing" to it.
+    ///
+    /// The specific value of `TAIL` is:
+    ///
+    /// 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000000
+    ///
+    /// This ensures that no value in the Merkle tree exceeds the modulus, maintaining proper order
+    /// and integrity within the BLS12-381 field.
     pub const TAIL: &'static str =
-        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+        "73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000000";
 
     /// Convenience method for creating a new leaf node.
     /// See `LeafNode::new` for more information.
@@ -156,13 +176,13 @@ impl Node {
         value: String,
         next: String,
     ) -> Self {
-        return Node::Leaf(LeafNode::new(active, is_left, label, value, next));
+        Node::Leaf(LeafNode::new(active, is_left, label, value, next))
     }
 
     /// Convenience method for creating a new inner node.
     /// See `InnerNode::new` for more information.
     pub fn new_inner(left: Node, right: Node, index: usize) -> Self {
-        return Node::Inner(InnerNode::new(left, right, index));
+        Node::Inner(InnerNode::new(left, right, index))
     }
 
     /// Returns the hash of the node.
@@ -215,9 +235,8 @@ impl Node {
     /// This function sets the `next` node identifier for a leaf node. This is important for maintaining
     /// the linked list structure of leaf nodes within the tree, enabling efficient traversal and modifications.
     pub fn set_next(&mut self, next: String) {
-        match self {
-            Node::Leaf(leaf) => leaf.next = next,
-            _ => (),
+        if let Node::Leaf(leaf) = self {
+            leaf.next = next;
         }
     }
 
@@ -229,7 +248,7 @@ impl Node {
     pub fn get_label(&self) -> String {
         match self {
             Node::Leaf(leaf) => leaf.label.clone(),
-            _ => Node::EMPTY_HASH.to_string(),
+            _ => Node::HEAD.to_string(),
         }
     }
 
@@ -309,11 +328,11 @@ impl Node {
         match self {
             Node::Inner(node) => {
                 let hash = format!("{}{}", node.left.get_hash(), node.right.get_hash());
-                node.hash = sha256(&hash);
+                node.hash = sha256_mod(&hash);
             }
             Node::Leaf(leaf) => {
                 let hash = format!("{}{}{}{}", leaf.active, leaf.label, leaf.value, leaf.next);
-                leaf.hash = sha256(&hash);
+                leaf.hash = sha256_mod(&hash);
             }
         }
     }

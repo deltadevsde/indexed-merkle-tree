@@ -1,6 +1,6 @@
 [package]
 name = "indexed-merkle-tree"
-version = "0.3.4"
+version = "0.4.0"
 edition = "2021"
 authors = ["Ryan Ford <ryan@deltadevs.xyz>", "Sebastian Pusch <sebastian@deltadevs.xyz>"]
 description = "This crate provides an implementation of Indexed Merkle Trees, a version of Merkle trees that supports both membership and non-membership proofs."
@@ -11,9 +11,12 @@ keywords = ["crypto", "merkle-tree", "membership", "non-membership"]
 readme = "README.md"
 
 [dependencies]
-crypto-hash = "0.3.4"
 num = "0.4.0"
 serde = { version = "1.0.151", features = ["derive", "rc"] }
 thiserror = "1.0.50"
 serde_json = "1.0.79"
 cargo-audit = "0.20.0"
+sha2 = "0.10.8"
+num-bigint = "0.4.6"
+num-traits = "0.2.19"
+hex = "0.4.3"
