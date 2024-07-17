@@ -4,7 +4,7 @@
 
 The Indexed Merkle Tree crate provides a robust implementation of indexed Merkle trees in particular described for [Transparency Dictionaries](https://eprint.iacr.org/2021/1263.pdf) that can be used for various cryptographic applications. Compared to normal Merkle trees, this implementation provides proofs for both membership and non-membership, ensuring uniqueness of leaf nodes.
 
-## Breaking Changes in Version 0.5.0
+## Breaking Changes in Version 0.4.0
 
 Version 0.5.0 introduces breaking changes:
 
