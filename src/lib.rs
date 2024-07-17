@@ -50,7 +50,14 @@ pub fn sha256_mod(input: &str) -> String {
 
     // Compute hash modulo the modulus of BLS12-381 curve
     let modded_hash = hash_bigint % modulus;
+    let mut bytes = modded_hash.to_bytes_be();
+    if bytes.len() < 32 {
+        bytes = std::iter::repeat(0)
+            .take(32 - bytes.len())
+            .chain(bytes)
+            .collect();
+    }
 
     // Convert result to hexadecimal string and return
-    hex::encode(modded_hash.to_bytes_be())
+    hex::encode(bytes)
 }
