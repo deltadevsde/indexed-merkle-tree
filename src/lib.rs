@@ -4,7 +4,43 @@ pub mod tree;
 
 use num::BigUint;
 use num_traits::Num;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct Hash([u8; 32]);
+
+impl Hash {
+    pub const fn new(bytes: [u8; 32]) -> Self {
+        Hash(bytes)
+    }
+
+    pub fn from_hex(hex: &str) -> Result<Self, hex::FromHexError> {
+        let bytes = hex::decode(hex)?;
+        if bytes.len() != 32 {
+            return Err(hex::FromHexError::InvalidStringLength);
+        }
+        let mut array = [0u8; 32];
+        array.copy_from_slice(&bytes);
+        Ok(Hash(array))
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
+    }
+}
+
+impl AsRef<[u8]> for Hash {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for Hash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
 
 pub const MODULUS: &str = "73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
@@ -19,10 +55,10 @@ pub const MODULUS: &str = "73eda753299d7d483339d80809a1d80553bda402fffe5bfefffff
 /// # Returns
 /// A `String` representing the hexadecimal SHA256 hash of the input.
 /// TODO: Implement the `sha256` function that computes the SHA256 hash of the given string but with the `sha2` crate (should return a [u8; 32] bc we want to use that in the future everywhere instead of strings).
-pub fn sha256(input: &str) -> String {
+pub fn sha256(input: &[u8]) -> Hash {
     let mut hasher = Sha256::new();
-    hasher.update(input.as_bytes());
-    hex::encode(hasher.finalize())
+    hasher.update(input);
+    Hash(hasher.finalize().into())
 }
 
 /// Computes the SHA256 hash of the given string and reduces it modulo the BLS12-381 curve modulus.
@@ -36,19 +72,11 @@ pub fn sha256(input: &str) -> String {
 ///
 /// # Returns
 /// A `String` representing the hexadecimal SHA256 hash of the input reduced modulo the BLS12-381 curve modulus.
-pub fn sha256_mod(input: &str) -> String {
-    // Compute the SHA256 hash
-    let mut hasher = Sha256::new();
-    hasher.update(input.as_bytes());
-    let hash_result = hasher.finalize();
 
-    // Convert hash to BigUint
-    let hash_bigint = BigUint::from_bytes_be(&hash_result);
-
-    // Convert modulus to BigUint
+pub fn sha256_mod(input: &[u8]) -> Hash {
+    let hash = sha256(input);
+    let hash_bigint = BigUint::from_bytes_be(hash.as_ref());
     let modulus = BigUint::from_str_radix(MODULUS, 16).expect("Invalid modulus");
-
-    // Compute hash modulo the modulus of BLS12-381 curve
     let modded_hash = hash_bigint % modulus;
     let mut bytes = modded_hash.to_bytes_be();
     if bytes.len() < 32 {
@@ -57,7 +85,5 @@ pub fn sha256_mod(input: &str) -> String {
             .chain(bytes)
             .collect();
     }
-
-    // Convert result to hexadecimal string and return
-    hex::encode(bytes)
+    Hash::new(bytes.try_into().unwrap())
 }

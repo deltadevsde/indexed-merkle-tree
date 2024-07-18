@@ -1,15 +1,16 @@
-use num::{BigInt, Num};
+use num::BigInt;
+use num_bigint::Sign;
 use serde::{Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
 use crate::node::{InnerNode, LeafNode, Node};
-use crate::sha256_mod;
+use crate::{sha256_mod, Hash};
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MerkleProof {
     // Root hash of the Merkle Tree.
-    pub root_hash: String, // should be [u8; 32]
+    pub root_hash: Hash,
     // Path from the leaf to the root.
     pub path: Vec<Node>,
 }
@@ -55,9 +56,10 @@ impl NonMembershipProof {
     /// `true` if the proof is valid and the node is not present, `false` otherwise.
     pub fn verify(&self) -> bool {
         if let Some(Node::Leaf(leaf)) = self.merkle_proof.path.first() {
-            let current_label = BigInt::from_str_radix(&leaf.label, 16).unwrap();
-            let current_next = BigInt::from_str_radix(&leaf.next, 16).unwrap();
-            let new_label = BigInt::from_str_radix(&self.missing_node.label, 16).unwrap();
+            let current_label = BigInt::from_bytes_be(Sign::Plus, leaf.label.as_ref());
+            let current_next = BigInt::from_bytes_be(Sign::Plus, leaf.next.as_ref());
+            let new_label = BigInt::from_bytes_be(Sign::Plus, self.missing_node.label.as_ref());
+
             if self.merkle_proof.verify() && new_label > current_label && new_label < current_next {
                 return true;
             }
@@ -107,16 +109,16 @@ impl MerkleProof {
     pub fn verify(&self) -> bool {
         match (&self.root_hash, &self.path) {
             (root, path) if !path.is_empty() => {
-                // save the first now as current hash and skip it in the loop to start with the second
+                // Save the first hash as current_hash and skip it in the loop to start with the second
                 let mut current_hash = path[0].get_hash();
 
                 for node in path.iter().skip(1) {
-                    let hash = if node.is_left_sibling() {
-                        format!("{}{}", node.get_hash(), current_hash)
+                    let combined = if node.is_left_sibling() {
+                        [node.get_hash().as_ref(), current_hash.as_ref()].concat()
                     } else {
-                        format!("{}{}", current_hash, node.get_hash())
+                        [current_hash.as_ref(), node.get_hash().as_ref()].concat()
                     };
-                    current_hash = sha256_mod(&hash);
+                    current_hash = sha256_mod(&combined);
                 }
                 &current_hash == root
             }
@@ -176,8 +178,8 @@ impl IndexedMerkleTree {
     /// A `Result<Self, MerkleTreeError>` representing the initialized tree or an error.
     pub fn new_with_size(size: usize) -> Result<Self, MerkleTreeError> {
         let mut nodes: Vec<Node> = Vec::with_capacity(2 * size + 1);
-        let empty_hash = Node::HEAD.to_string();
-        let tail = Node::TAIL.to_string();
+        let empty_hash = Node::HEAD;
+        let tail = Node::TAIL;
 
         let active_node = Node::new_leaf(
             true,
@@ -271,8 +273,8 @@ impl IndexedMerkleTree {
     /// # Returns
     ///
     /// The current commitment (hash of the root node) of the Indexed Merkle tree.
-    pub fn get_commitment(&self) -> Result<String, MerkleTreeError> {
-        Ok(self.get_root()?.get_hash().to_string())
+    pub fn get_commitment(&self) -> Result<Hash, MerkleTreeError> {
+        Ok(self.get_root()?.get_hash())
     }
 
     /// Finds the index of a specific node in the indexed Merkle Tree.
@@ -320,15 +322,10 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     /// An `Option<Node>` representing the found leaf node, if any.
-    pub fn find_leaf_by_label(&self, label: &String) -> Option<Node> {
+    ///
+    pub fn find_leaf_by_label(&self, label: &Hash) -> Option<Node> {
         self.nodes.iter().find_map(|node| match node {
-            Node::Leaf(leaf) => {
-                if &leaf.label == label {
-                    Some(node.clone())
-                } else {
-                    None
-                }
-            }
+            Node::Leaf(leaf) if &leaf.label == label => Some(node.clone()),
             _ => None,
         })
     }
@@ -385,10 +382,9 @@ impl IndexedMerkleTree {
             current_index =
                 ((current_index as f64 + self.nodes.len() as f64) / 2.0).ceil() as usize;
         }
-        let root = self.get_commitment()?;
 
         Ok(MerkleProof {
-            root_hash: root,
+            root_hash: self.get_commitment()?,
             path: proof_path,
         })
     }
@@ -417,21 +413,14 @@ impl IndexedMerkleTree {
         let mut found_index = None;
         for (index, current_node) in self.nodes.iter().enumerate() {
             if let Node::Leaf(current_leaf) = current_node {
-                let current_label = BigInt::from_str_radix(&current_leaf.label, 16);
-                let current_next = BigInt::from_str_radix(&current_leaf.next, 16);
-                let new_label = BigInt::from_str_radix(&given_node_as_leaf.label, 16);
+                let current_label = BigInt::from_bytes_be(Sign::Plus, current_leaf.label.as_ref());
+                let current_next = BigInt::from_bytes_be(Sign::Plus, current_leaf.next.as_ref());
+                let new_label =
+                    BigInt::from_bytes_be(Sign::Plus, given_node_as_leaf.label.as_ref());
 
-                if let (Ok(current_label), Ok(current_next), Ok(new_label)) =
-                    (current_label, current_next, new_label)
-                {
-                    if current_label < new_label && new_label < current_next {
-                        found_index = Some(index);
-                        break;
-                    }
-                } else {
-                    return Err(MerkleTreeError::InvalidFormatError(
-                        "BigInt from label or next pointer".to_string(),
-                    ));
+                if current_label < new_label && new_label < current_next {
+                    found_index = Some(index);
+                    break;
                 }
             }
         }
@@ -586,20 +575,19 @@ pub fn set_left_sibling_status_for_nodes(nodes: Vec<Node>) -> Vec<Node> {
 ///
 /// # Returns
 /// A `Result<Vec<Node>, MerkleTreeError>` representing the sorted nodes or an error.
+
 pub fn resort_nodes_by_input_order(
     nodes: Vec<Node>,
-    input_order: Vec<String>,
+    input_order: Vec<Hash>,
 ) -> Result<Vec<Node>, MerkleTreeError> {
     let valid_nodes: Vec<_> = nodes
         .into_iter()
         .filter_map(|node| {
-            // we dont want to sort directly, when we only sort valid nodes so we dont have to handle results in the sorting function
             let label = match &node {
                 Node::Inner(_) => None,
                 Node::Leaf(leaf) => Some(leaf.label.clone()),
             };
 
-            // if there is a valid label search for the index in the ordered_derived_dict_keys and return it with the node
             label.and_then(|l| {
                 input_order
                     .iter()

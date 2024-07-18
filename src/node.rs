@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::sha256_mod;
+use crate::{sha256_mod, Hash};
 
 /// Represents an inner node in the indexed Merkle Tree.
 ///
@@ -16,7 +16,7 @@ use crate::sha256_mod;
 /// - `right`: A reference-counted pointer to the right child node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InnerNode {
-    pub hash: String,
+    pub hash: Hash,
     pub is_left_sibling: bool,
     pub left: Arc<Node>,
     pub right: Arc<Node>,
@@ -37,8 +37,10 @@ impl InnerNode {
     /// # Returns
     /// An `InnerNode` representing the newly created inner node.
     pub fn new(left: Node, right: Node, index: usize) -> Self {
+        // we need to use the .as_ref() method to convert the Hash to a slice of bytes ([u8])
+        let hash = sha256_mod(&[left.get_hash().as_ref(), right.get_hash().as_ref()].concat());
         InnerNode {
-            hash: sha256_mod(&format!("{}{}", left.get_hash(), right.get_hash())),
+            hash,
             is_left_sibling: index % 2 == 0,
             left: Arc::new(left),
             right: Arc::new(right),
@@ -64,12 +66,12 @@ impl InnerNode {
 /// - `next`: A reference to the next node in the tree.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LeafNode {
-    pub hash: String,
+    pub hash: Hash,
     pub is_left_sibling: bool,
     pub active: bool,
-    pub value: String,
-    pub label: String,
-    pub next: String,
+    pub value: Hash,
+    pub label: Hash,
+    pub next: Hash,
 }
 
 impl LeafNode {
@@ -87,10 +89,18 @@ impl LeafNode {
     ///
     /// # Returns
     /// * A new leaf node with the specified properties.
-    pub fn new(active: bool, is_left: bool, label: String, value: String, next: String) -> Self {
-        let hash = format!("{}{}{}{}", active, label, value, next);
+    pub fn new(active: bool, is_left: bool, label: Hash, value: Hash, next: Hash) -> Self {
+        let hash = sha256_mod(
+            &[
+                &[active as u8],
+                label.as_ref(),
+                value.as_ref(),
+                next.as_ref(),
+            ]
+            .concat(),
+        );
         LeafNode {
-            hash: sha256_mod(&hash),
+            hash,
             is_left_sibling: is_left,
             active,
             value,
@@ -102,14 +112,7 @@ impl LeafNode {
 
 impl Default for LeafNode {
     fn default() -> Self {
-        LeafNode::new(
-            false,
-            // default leaf nodes are not left siblings
-            false,
-            Node::HEAD.to_string(),
-            Node::HEAD.to_string(),
-            Node::TAIL.to_string(),
-        )
+        LeafNode::new(false, false, Node::HEAD, Node::HEAD, Node::TAIL)
     }
 }
 
@@ -145,8 +148,7 @@ impl Node {
     /// The value `HEAD` is used in the following ways:
     /// - As the starting point or initial value in the Merkle tree.
     /// - As a placeholder for empty or null nodes.
-    pub const HEAD: &'static str =
-        "0000000000000000000000000000000000000000000000000000000000000000";
+    pub const HEAD: Hash = Hash::new([0; 32]);
 
     /// This constant represents the largest possible value in the field Fp for the BLS12-381 curve.
     ///
@@ -164,18 +166,15 @@ impl Node {
     ///
     /// This ensures that no value in the Merkle tree exceeds the modulus, maintaining proper order
     /// and integrity within the BLS12-381 field.
-    pub const TAIL: &'static str =
-        "73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000000";
+    pub const TAIL: Hash = Hash::new([
+        0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8, 0x08, 0x09, 0xa1, 0xd8,
+        0x05, 0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe, 0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
+        0x00, 0x00,
+    ]);
 
     /// Convenience method for creating a new leaf node.
     /// See `LeafNode::new` for more information.
-    pub fn new_leaf(
-        active: bool,
-        is_left: bool,
-        label: String,
-        value: String,
-        next: String,
-    ) -> Self {
+    pub fn new_leaf(active: bool, is_left: bool, label: Hash, value: Hash, next: Hash) -> Self {
         Node::Leaf(LeafNode::new(active, is_left, label, value, next))
     }
 
@@ -188,7 +187,7 @@ impl Node {
     /// Returns the hash of the node.
     ///
     /// This function returns the hash of either an inner node or a leaf node, depending on the node type.
-    pub fn get_hash(&self) -> String {
+    pub fn get_hash(&self) -> Hash {
         match self {
             Node::Inner(inner_node) => inner_node.hash.clone(),
             Node::Leaf(leaf) => leaf.hash.clone(),
@@ -223,10 +222,10 @@ impl Node {
     ///
     /// This function retrieves the `next` node identifier for a leaf node, or returns the `TAIL` identifier
     /// if the node is not a leaf. This is useful for traversing linked lists of leaf nodes.
-    pub fn get_next(&self) -> String {
+    pub fn get_next(&self) -> Hash {
         match self {
             Node::Leaf(leaf) => leaf.next.clone(),
-            _ => Node::TAIL.to_string(),
+            _ => Node::TAIL,
         }
     }
 
@@ -234,7 +233,7 @@ impl Node {
     ///
     /// This function sets the `next` node identifier for a leaf node. This is important for maintaining
     /// the linked list structure of leaf nodes within the tree, enabling efficient traversal and modifications.
-    pub fn set_next(&mut self, next: String) {
+    pub fn set_next(&mut self, next: Hash) {
         if let Node::Leaf(leaf) = self {
             leaf.next = next;
         }
@@ -245,10 +244,10 @@ impl Node {
     /// This function retrieves the `label` for a leaf node, or returns the `EMPTY_HASH` identifier
     /// if the node is not a leaf. This is useful for accessing the label of leaf nodes within the tree,
     /// which may represent some data or key associated with that node.
-    pub fn get_label(&self) -> String {
+    pub fn get_label(&self) -> Hash {
         match self {
             Node::Leaf(leaf) => leaf.label.clone(),
-            _ => Node::HEAD.to_string(),
+            _ => Node::HEAD,
         }
     }
 
@@ -327,12 +326,26 @@ impl Node {
     pub fn generate_hash(&mut self) {
         match self {
             Node::Inner(node) => {
-                let hash = format!("{}{}", node.left.get_hash(), node.right.get_hash());
-                node.hash = sha256_mod(&hash);
+                let hash = sha256_mod(
+                    &[
+                        node.left.get_hash().as_ref(),
+                        node.right.get_hash().as_ref(),
+                    ]
+                    .concat(),
+                );
+                node.hash = hash;
             }
             Node::Leaf(leaf) => {
-                let hash = format!("{}{}{}{}", leaf.active, leaf.label, leaf.value, leaf.next);
-                leaf.hash = sha256_mod(&hash);
+                let hash = sha256_mod(
+                    &[
+                        &[leaf.active as u8],
+                        leaf.label.as_ref(),
+                        leaf.value.as_ref(),
+                        leaf.next.as_ref(),
+                    ]
+                    .concat(),
+                );
+                leaf.hash = hash;
             }
         }
     }
