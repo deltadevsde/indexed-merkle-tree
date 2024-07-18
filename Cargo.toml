@@ -1,6 +1,6 @@
 [package]
 name = "indexed-merkle-tree"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 authors = ["Ryan Quinn Ford <ryan@deltadevs.xyz>", "Sebastian Pusch <sebastian@deltadevs.xyz>"]
 description = "This crate provides an implementation of Indexed Merkle Trees, a version of Merkle trees that supports both membership and non-membership proofs."
