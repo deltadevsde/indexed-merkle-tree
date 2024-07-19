@@ -2,7 +2,10 @@
 name = "indexed-merkle-tree"
 version = "0.5.1"
 edition = "2021"
-authors = ["Ryan Quinn Ford <ryan@deltadevs.xyz>", "Sebastian Pusch <sebastian@deltadevs.xyz>"]
+authors = [
+    "Ryan Quinn Ford <ryan@deltadevs.xyz>",
+    "Sebastian Pusch <sebastian@deltadevs.xyz>",
+]
 description = "This crate provides an implementation of Indexed Merkle Trees, a version of Merkle trees that supports both membership and non-membership proofs."
 homepage = "https://github.com/deltadevsde/indexed-merkle-tree"
 repository = "https://github.com/deltadevsde/indexed-merkle-tree"
@@ -20,3 +23,11 @@ sha2 = "0.10.8"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 hex = "0.4.3"
+
+[dev-dependencies]
+criterion = "0.3"
+rand = "0.8"
+
+[[bench]]
+name = "tree_benchmarks"
+harness = false
