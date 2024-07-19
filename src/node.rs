@@ -14,7 +14,7 @@ use crate::{sha256_mod, Hash};
 /// - `is_left_sibling`: Indicates whether this node is a left child of its parent.
 /// - `left`: A reference-counted pointer to the left child node.
 /// - `right`: A reference-counted pointer to the right child node.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct InnerNode {
     pub hash: Hash,
     pub is_left_sibling: bool,
@@ -64,7 +64,7 @@ impl InnerNode {
 /// - `value`: The actual data value stored in the node.
 /// - `label`: A unique identifier for the node. This is used to sort by size and to link nodes together.
 /// - `next`: A reference to the next node in the tree.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct LeafNode {
     pub hash: Hash,
     pub is_left_sibling: bool,
@@ -126,7 +126,7 @@ impl Default for LeafNode {
 /// Variants:
 /// - `Inner(InnerNode)`: An inner node of the tree, containing references to child nodes.
 /// - `Leaf(LeafNode)`: A leaf node, containing the actual data (hash of its metadata).
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Node {
     Inner(InnerNode),
     Leaf(LeafNode),
@@ -189,8 +189,8 @@ impl Node {
     /// This function returns the hash of either an inner node or a leaf node, depending on the node type.
     pub fn get_hash(&self) -> Hash {
         match self {
-            Node::Inner(inner_node) => inner_node.hash.clone(),
-            Node::Leaf(leaf) => leaf.hash.clone(),
+            Node::Inner(inner_node) => inner_node.hash,
+            Node::Leaf(leaf) => leaf.hash,
         }
     }
 
@@ -224,7 +224,7 @@ impl Node {
     /// if the node is not a leaf. This is useful for traversing linked lists of leaf nodes.
     pub fn get_next(&self) -> Hash {
         match self {
-            Node::Leaf(leaf) => leaf.next.clone(),
+            Node::Leaf(leaf) => leaf.next,
             _ => Node::TAIL,
         }
     }
@@ -246,7 +246,7 @@ impl Node {
     /// which may represent some data or key associated with that node.
     pub fn get_label(&self) -> Hash {
         match self {
-            Node::Leaf(leaf) => leaf.label.clone(),
+            Node::Leaf(leaf) => leaf.label,
             _ => Node::HEAD,
         }
     }
@@ -309,7 +309,7 @@ impl Node {
     pub fn update_next_pointer(existing_node: &mut Self, new_node: &Self) {
         if let Self::Leaf(ref mut existing_leaf) = existing_node {
             if let Self::Leaf(new_leaf) = new_node {
-                existing_leaf.next = new_leaf.label.clone();
+                existing_leaf.next = new_leaf.label;
             }
         }
     }
@@ -348,5 +348,155 @@ impl Node {
                 leaf.hash = hash;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_leaf_node_creation() {
+        let label = Hash::new([1; 32]);
+        let value = Hash::new([2; 32]);
+        let next = Hash::new([3; 32]);
+        let leaf = LeafNode::new(true, true, label, value, next);
+
+        assert!(leaf.active);
+        assert!(leaf.is_left_sibling);
+        assert_eq!(leaf.label, label);
+        assert_eq!(leaf.value, value);
+        assert_eq!(leaf.next, next);
+    }
+
+    #[test]
+    fn test_inner_node_creation() {
+        let left = Node::new_leaf(
+            true,
+            true,
+            Hash::new([1; 32]),
+            Hash::new([2; 32]),
+            Hash::new([3; 32]),
+        );
+        let right = Node::new_leaf(
+            false,
+            false,
+            Hash::new([4; 32]),
+            Hash::new([5; 32]),
+            Hash::new([6; 32]),
+        );
+        let inner = Node::new_inner(left.clone(), right.clone(), 0);
+
+        if let Node::Inner(inner_node) = inner {
+            assert!(inner_node.is_left_sibling);
+            assert_eq!(*inner_node.left, left);
+            assert_eq!(*inner_node.right, right);
+        } else {
+            panic!("Expected Inner node");
+        }
+    }
+
+    #[test]
+    fn test_node_is_active() {
+        let active_leaf = Node::new_leaf(
+            true,
+            true,
+            Hash::new([1; 32]),
+            Hash::new([2; 32]),
+            Hash::new([3; 32]),
+        );
+        let inactive_leaf = Node::new_leaf(
+            false,
+            true,
+            Hash::new([1; 32]),
+            Hash::new([2; 32]),
+            Hash::new([3; 32]),
+        );
+        let inner_node = Node::new_inner(active_leaf.clone(), inactive_leaf.clone(), 0);
+
+        assert!(active_leaf.is_active());
+        assert!(!inactive_leaf.is_active());
+        assert!(inner_node.is_active());
+    }
+
+    #[test]
+    fn test_node_get_next() {
+        let leaf = Node::new_leaf(
+            true,
+            true,
+            Hash::new([1; 32]),
+            Hash::new([2; 32]),
+            Hash::new([3; 32]),
+        );
+        let inner = Node::new_inner(leaf.clone(), leaf.clone(), 0);
+
+        assert_eq!(leaf.get_next(), Hash::new([3; 32]));
+        assert_eq!(inner.get_next(), Node::TAIL);
+    }
+
+    #[test]
+    fn test_node_set_next() {
+        let mut leaf = Node::new_leaf(
+            true,
+            true,
+            Hash::new([1; 32]),
+            Hash::new([2; 32]),
+            Hash::new([3; 32]),
+        );
+        let new_next = Hash::new([4; 32]);
+        leaf.set_next(new_next);
+
+        if let Node::Leaf(leaf_node) = leaf {
+            assert_eq!(leaf_node.next, new_next);
+        } else {
+            panic!("Expected Leaf node");
+        }
+    }
+
+    #[test]
+    fn test_node_update_next_pointer() {
+        let mut existing_node = Node::new_leaf(
+            true,
+            true,
+            Hash::new([1; 32]),
+            Hash::new([2; 32]),
+            Hash::new([3; 32]),
+        );
+        let new_node = Node::new_leaf(
+            true,
+            false,
+            Hash::new([4; 32]),
+            Hash::new([5; 32]),
+            Hash::new([6; 32]),
+        );
+
+        Node::update_next_pointer(&mut existing_node, &new_node);
+
+        if let Node::Leaf(leaf_node) = existing_node {
+            assert_eq!(leaf_node.next, Hash::new([4; 32]));
+        } else {
+            panic!("Expected Leaf node");
+        }
+    }
+
+    #[test]
+    fn test_node_generate_hash() {
+        let mut leaf = Node::new_leaf(
+            true,
+            true,
+            Hash::new([1; 32]),
+            Hash::new([2; 32]),
+            Hash::new([3; 32]),
+        );
+        let original_hash = leaf.get_hash();
+
+        if let Node::Leaf(ref mut leaf_node) = leaf {
+            leaf_node.value = Hash::new([4; 32]);
+        }
+
+        leaf.generate_hash();
+        let new_hash = leaf.get_hash();
+
+        assert_ne!(original_hash, new_hash);
     }
 }

@@ -181,24 +181,11 @@ impl IndexedMerkleTree {
         let empty_hash = Node::HEAD;
         let tail = Node::TAIL;
 
-        let active_node = Node::new_leaf(
-            true,
-            true,
-            empty_hash.clone(),
-            empty_hash.clone(),
-            tail.clone(),
-        );
+        let active_node = Node::new_leaf(true, true, empty_hash, empty_hash, tail);
         nodes.push(active_node);
 
-        let left_inactive_node = Node::new_leaf(
-            false,
-            true,
-            empty_hash.clone(),
-            empty_hash.clone(),
-            tail.clone(),
-        );
-        let right_inactive_node =
-            Node::new_leaf(false, false, empty_hash.clone(), empty_hash, tail);
+        let left_inactive_node = Node::new_leaf(false, true, empty_hash, empty_hash, tail);
+        let right_inactive_node = Node::new_leaf(false, false, empty_hash, empty_hash, tail);
 
         let alternates = vec![left_inactive_node, right_inactive_node]
             .into_iter()
@@ -607,11 +594,166 @@ pub fn resort_nodes_by_input_order(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node::Node;
+
+    fn create_test_hash(value: u8) -> Hash {
+        Hash::new([value; 32])
+    }
+
+    #[test]
+    fn test_new_indexed_merkle_tree() {
+        let nodes = vec![
+            Node::new_leaf(
+                true,
+                true,
+                create_test_hash(1),
+                create_test_hash(2),
+                create_test_hash(3),
+            ),
+            Node::new_leaf(
+                false,
+                false,
+                create_test_hash(4),
+                create_test_hash(5),
+                create_test_hash(6),
+            ),
+        ];
+        let tree = IndexedMerkleTree::new(nodes).unwrap();
+        assert_eq!(tree.nodes.len(), 3); // 2 leaf nodes + 1 root node
+    }
 
     #[test]
     fn test_new_with_size() {
-        let n = 4;
-        let tree = IndexedMerkleTree::new_with_size(n).unwrap();
-        assert_eq!(tree.nodes.len(), 2 * n - 1);
+        let tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        assert_eq!(tree.nodes.len(), 7); // 4 leaf nodes + 3 inner nodes
+    }
+
+    #[test]
+    fn test_get_root() {
+        let tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let root = tree.get_root().unwrap();
+        assert!(matches!(root, Node::Inner(_)));
+    }
+
+    #[test]
+    fn test_get_commitment() {
+        let tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let commitment = tree.get_commitment().unwrap();
+        assert_eq!(commitment.as_ref().len(), 32);
+    }
+
+    #[test]
+    fn test_find_node_index() {
+        let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let new_leaf = Node::new_leaf(
+            true,
+            true,
+            create_test_hash(1),
+            create_test_hash(2),
+            create_test_hash(3),
+        );
+        tree.nodes[0] = new_leaf.clone();
+        assert_eq!(tree.find_node_index(&new_leaf), Some(0));
+    }
+
+    #[test]
+    fn test_find_leaf_by_label() {
+        let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let label = create_test_hash(1);
+        let new_leaf = Node::new_leaf(true, true, label, create_test_hash(2), create_test_hash(3));
+        tree.nodes[0] = new_leaf.clone();
+        assert_eq!(tree.find_leaf_by_label(&label), Some(new_leaf));
+    }
+
+    #[test]
+    fn test_double_tree_size() {
+        let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let original_size = tree.nodes.len();
+        tree.double_tree_size();
+        assert_eq!(tree.nodes.len(), original_size * 2 + 1);
+    }
+
+    #[test]
+    fn test_generate_membership_proof() {
+        let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let new_leaf = Node::new_leaf(
+            true,
+            true,
+            create_test_hash(1),
+            create_test_hash(2),
+            create_test_hash(3),
+        );
+        tree.nodes[0] = new_leaf;
+        let proof = tree.generate_membership_proof(0).unwrap();
+        assert_eq!(proof.path.len(), 3); // leaf + 2 inner nodes
+    }
+
+    #[test]
+    fn test_generate_non_membership_proof() {
+        let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let mut existing_leaf = Node::new_leaf(
+            true,
+            true,
+            create_test_hash(1),
+            create_test_hash(2),
+            create_test_hash(3),
+        );
+        let insert_proof = tree.insert_node(&mut existing_leaf);
+        assert!(insert_proof.is_ok());
+
+        let non_existent_leaf = Node::new_leaf(
+            true,
+            true,
+            create_test_hash(4),
+            create_test_hash(5),
+            create_test_hash(6),
+        );
+
+        let proof = tree
+            .generate_non_membership_proof(&non_existent_leaf)
+            .unwrap();
+        assert_eq!(proof.closest_index, 1);
+    }
+
+    #[test]
+    fn test_update_node() {
+        let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let original_leaf = Node::new_leaf(
+            true,
+            true,
+            create_test_hash(1),
+            create_test_hash(2),
+            create_test_hash(3),
+        );
+        tree.nodes[0] = original_leaf.clone();
+        let new_leaf = Node::new_leaf(
+            true,
+            true,
+            create_test_hash(4),
+            create_test_hash(5),
+            create_test_hash(6),
+        );
+        let update_proof = tree.update_node(0, new_leaf.clone()).unwrap();
+        assert_eq!(tree.nodes[0], new_leaf);
+        assert!(update_proof.old_proof.path[0] == original_leaf);
+        assert!(update_proof.new_proof.path[0] == new_leaf);
+    }
+
+    #[test]
+    fn test_insert_node() {
+        let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
+        let mut new_leaf = Node::new_leaf(
+            true,
+            true,
+            create_test_hash(1),
+            create_test_hash(2),
+            create_test_hash(3),
+        );
+        let insert_proof = tree.insert_node(&mut new_leaf).unwrap();
+        assert!(tree.nodes.iter().any(|node| node == &new_leaf));
+        assert_eq!(
+            insert_proof.non_membership_proof.missing_node.label,
+            new_leaf.get_label()
+        );
     }
 }
