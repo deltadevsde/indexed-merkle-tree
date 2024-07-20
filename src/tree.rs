@@ -584,7 +584,6 @@ impl IndexedMerkleTree {
             f: &mut fmt::Formatter<'_>,
             node: &Node,
             parent_id: Option<usize>,
-            is_left: bool,
             node_id: &mut usize,
         ) -> fmt::Result {
             let current_id = *node_id;
@@ -592,16 +591,23 @@ impl IndexedMerkleTree {
 
             match node {
                 Node::Inner(inner) => {
-                    writeln!(f, "    N{current_id}[Inner {:.6}]", inner.hash)?;
+                    writeln!(
+                        f,
+                        "    N{current_id}[Inner {:.6}]",
+                        &inner.hash.to_string()[..8]
+                    )?;
                     if let Some(pid) = parent_id {
                         writeln!(f, "    N{pid} --> N{current_id}")?;
                     }
-                    write_node(f, &inner.left, Some(current_id), true, node_id)?;
-                    write_node(f, &inner.right, Some(current_id), false, node_id)?;
+                    write_node(f, &inner.left, Some(current_id), node_id)?;
+                    write_node(f, &inner.right, Some(current_id), node_id)?;
                 }
                 Node::Leaf(leaf) => {
-                    let label = if leaf.active { "Active" } else { "Inactive" };
-                    writeln!(f, "    N{current_id}[Leaf {:.6} {}]", leaf.hash, label)?;
+                    writeln!(
+                        f,
+                        "    N{current_id}[Hash: n{:.6}...\\nNext: {:.6}...\\nLabel: {:.6}...\\nValue: {:.6}...\\n]",
+                        &leaf.hash.to_string()[..8], &leaf.next.to_string()[..8], &leaf.label.to_string()[..8], &leaf.value.to_string()[..8]
+                    )?;
                     if let Some(pid) = parent_id {
                         writeln!(f, "    N{pid} --> N{current_id}")?;
                     }
@@ -611,7 +617,7 @@ impl IndexedMerkleTree {
         }
 
         if let Some(root) = self.nodes.last() {
-            write_node(f, root, None, true, &mut node_id)?;
+            write_node(f, root, None, &mut node_id)?;
         } else {
             writeln!(f, "    N0[Empty Tree]")?;
         }
@@ -619,15 +625,15 @@ impl IndexedMerkleTree {
         // Add styling
         writeln!(
             f,
-            "    classDef inner fill:#87CEFA,stroke:#4682B4,stroke-width:2px;"
+            "    classDef inner fill:#87CEFA,stroke:#4682B4,stroke-width:2px,color:black;"
         )?;
         writeln!(
             f,
-            "    classDef active fill:#98FB98,stroke:#006400,stroke-width:2px;"
+            "    classDef active fill:#98FB98,stroke:#006400,stroke-width:2px,color:black;"
         )?;
         writeln!(
             f,
-            "    classDef inactive fill:#FFA07A,stroke:#8B0000,stroke-width:2px;"
+            "    classDef inactive fill:#FFA07A,stroke:#8B0000,stroke-width:2px,color:black;"
         )?;
         writeln!(f, "    class N0 inner;")?;
         for i in 1..node_id {
