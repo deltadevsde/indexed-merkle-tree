@@ -60,7 +60,6 @@ impl InnerNode {
 /// Fields:
 /// - `hash`: The hash of the values below, expect of the is_left_sibling-value.
 /// - `is_left_sibling`: Indicates if this node is a left child in its parent node.
-/// - `active`: Status flag to indicate if the node is active in the tree.
 /// - `value`: The actual data value stored in the node.
 /// - `label`: A unique identifier for the node. This is used to sort by size and to link nodes together.
 /// - `next`: A reference to the next node in the tree.
@@ -68,7 +67,6 @@ impl InnerNode {
 pub struct LeafNode {
     pub hash: Hash,
     pub is_left_sibling: bool,
-    pub active: bool,
     pub value: Hash,
     pub label: Hash,
     pub next: Hash,
@@ -81,7 +79,6 @@ impl LeafNode {
     /// its active status, label, value, and next pointer. Additionally, the node is marked as a left sibling or not.
     ///
     /// # Arguments
-    /// * `active` - Boolean indicating if the leaf is active.
     /// * `is_left` - Boolean indicating if this is a left sibling.
     /// * `label` - Unique 256 bit identifier for the leaf.
     /// * `value` - 256 Bit data value of the leaf.
@@ -89,30 +86,25 @@ impl LeafNode {
     ///
     /// # Returns
     /// * A new leaf node with the specified properties.
-    pub fn new(active: bool, is_left: bool, label: Hash, value: Hash, next: Hash) -> Self {
-        let hash = sha256_mod(
-            &[
-                &[active as u8],
-                label.as_ref(),
-                value.as_ref(),
-                next.as_ref(),
-            ]
-            .concat(),
-        );
+    pub fn new(is_left: bool, label: Hash, value: Hash, next: Hash) -> Self {
+        let hash = sha256_mod(&[label.as_ref(), value.as_ref(), next.as_ref()].concat());
         LeafNode {
             hash,
             is_left_sibling: is_left,
-            active,
             value,
             label,
             next,
         }
     }
+
+    pub fn is_active(&self) -> bool {
+        self.value != Node::HEAD
+    }
 }
 
 impl Default for LeafNode {
     fn default() -> Self {
-        LeafNode::new(false, false, Node::HEAD, Node::HEAD, Node::TAIL)
+        LeafNode::new(false, Node::HEAD, Node::HEAD, Node::TAIL)
     }
 }
 
@@ -174,8 +166,8 @@ impl Node {
 
     /// Convenience method for creating a new leaf node.
     /// See `LeafNode::new` for more information.
-    pub fn new_leaf(active: bool, is_left: bool, label: Hash, value: Hash, next: Hash) -> Self {
-        Node::Leaf(LeafNode::new(active, is_left, label, value, next))
+    pub fn new_leaf(is_left: bool, label: Hash, value: Hash, next: Hash) -> Self {
+        Node::Leaf(LeafNode::new(is_left, label, value, next))
     }
 
     /// Convenience method for creating a new inner node.
@@ -214,7 +206,7 @@ impl Node {
     pub fn is_active(&self) -> bool {
         match self {
             Node::Inner(_) => true,
-            Node::Leaf(leaf) => leaf.active,
+            Node::Leaf(leaf) => leaf.is_active(),
         }
     }
 
@@ -260,18 +252,6 @@ impl Node {
         match self {
             Node::Inner(inner_node) => inner_node.is_left_sibling = is_left,
             Node::Leaf(leaf) => leaf.is_left_sibling = is_left,
-        }
-    }
-
-    /// Activates a leaf node.
-    ///
-    /// This function sets the `active` flag of a leaf node to true. It has no effect on inner nodes, because they are always active.
-    /// Activating a leaf node can be an important operation when managing the data within the indexed Merkle Tree,
-    /// especially in scenarios involving data updates or dynamic tree modifications.
-    pub fn set_node_active(&mut self) {
-        match self {
-            Node::Inner(_) => (),
-            Node::Leaf(ref mut leaf) => leaf.active = true,
         }
     }
 
@@ -338,7 +318,8 @@ impl Node {
             Node::Leaf(leaf) => {
                 let hash = sha256_mod(
                     &[
-                        &[leaf.active as u8],
+                        // Question to reviewer: Does the active value really need to be part of the hash?
+                        &[leaf.is_active() as u8],
                         leaf.label.as_ref(),
                         leaf.value.as_ref(),
                         leaf.next.as_ref(),
@@ -360,9 +341,9 @@ mod tests {
         let label = Hash::new([1; 32]);
         let value = Hash::new([2; 32]);
         let next = Hash::new([3; 32]);
-        let leaf = LeafNode::new(true, true, label, value, next);
+        let leaf = LeafNode::new(true, label, value, next);
 
-        assert!(leaf.active);
+        assert!(leaf.is_active());
         assert!(leaf.is_left_sibling);
         assert_eq!(leaf.label, label);
         assert_eq!(leaf.value, value);
@@ -373,13 +354,11 @@ mod tests {
     fn test_inner_node_creation() {
         let left = Node::new_leaf(
             true,
-            true,
             Hash::new([1; 32]),
             Hash::new([2; 32]),
             Hash::new([3; 32]),
         );
         let right = Node::new_leaf(
-            false,
             false,
             Hash::new([4; 32]),
             Hash::new([5; 32]),
@@ -400,18 +379,11 @@ mod tests {
     fn test_node_is_active() {
         let active_leaf = Node::new_leaf(
             true,
-            true,
             Hash::new([1; 32]),
             Hash::new([2; 32]),
             Hash::new([3; 32]),
         );
-        let inactive_leaf = Node::new_leaf(
-            false,
-            true,
-            Hash::new([1; 32]),
-            Hash::new([2; 32]),
-            Hash::new([3; 32]),
-        );
+        let inactive_leaf = Node::new_leaf(true, Node::HEAD, Node::HEAD, Node::TAIL);
         let inner_node = Node::new_inner(active_leaf.clone(), inactive_leaf.clone(), 0);
 
         assert!(active_leaf.is_active());
@@ -422,7 +394,6 @@ mod tests {
     #[test]
     fn test_node_get_next() {
         let leaf = Node::new_leaf(
-            true,
             true,
             Hash::new([1; 32]),
             Hash::new([2; 32]),
@@ -437,7 +408,6 @@ mod tests {
     #[test]
     fn test_node_set_next() {
         let mut leaf = Node::new_leaf(
-            true,
             true,
             Hash::new([1; 32]),
             Hash::new([2; 32]),
@@ -457,13 +427,11 @@ mod tests {
     fn test_node_update_next_pointer() {
         let mut existing_node = Node::new_leaf(
             true,
-            true,
             Hash::new([1; 32]),
             Hash::new([2; 32]),
             Hash::new([3; 32]),
         );
         let new_node = Node::new_leaf(
-            true,
             false,
             Hash::new([4; 32]),
             Hash::new([5; 32]),
@@ -482,7 +450,6 @@ mod tests {
     #[test]
     fn test_node_generate_hash() {
         let mut leaf = Node::new_leaf(
-            true,
             true,
             Hash::new([1; 32]),
             Hash::new([2; 32]),

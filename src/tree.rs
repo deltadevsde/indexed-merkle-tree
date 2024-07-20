@@ -192,11 +192,11 @@ impl IndexedMerkleTree {
         let empty_hash = Node::HEAD;
         let tail = Node::TAIL;
 
-        let active_node = Node::new_leaf(true, true, empty_hash, empty_hash, tail);
+        let active_node = Node::new_leaf(true, empty_hash, empty_hash, tail);
         nodes.push(active_node);
 
-        let left_inactive_node = Node::new_leaf(false, true, empty_hash, empty_hash, tail);
-        let right_inactive_node = Node::new_leaf(false, false, empty_hash, empty_hash, tail);
+        let left_inactive_node = Node::new_leaf(true, empty_hash, empty_hash, tail);
+        let right_inactive_node = Node::new_leaf(false, empty_hash, empty_hash, tail);
 
         let alternates = vec![left_inactive_node, right_inactive_node]
             .into_iter()
@@ -559,7 +559,12 @@ impl IndexedMerkleTree {
                     writeln!(
                         f,
                         "{}Leaf Node (Hash: {}, Active: {}, Label: {}, Value: {}, Next: {})",
-                        node_prefix, leaf.hash, leaf.active, leaf.label, leaf.value, leaf.next
+                        node_prefix,
+                        leaf.hash,
+                        leaf.is_active(),
+                        leaf.label,
+                        leaf.value,
+                        leaf.next
                     )?;
                 }
             }
@@ -733,13 +738,11 @@ mod tests {
         let nodes = vec![
             Node::new_leaf(
                 true,
-                true,
                 create_test_hash(1),
                 create_test_hash(2),
                 create_test_hash(3),
             ),
             Node::new_leaf(
-                false,
                 false,
                 create_test_hash(4),
                 create_test_hash(5),
@@ -775,7 +778,6 @@ mod tests {
         let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
         let new_leaf = Node::new_leaf(
             true,
-            true,
             create_test_hash(1),
             create_test_hash(2),
             create_test_hash(3),
@@ -788,7 +790,7 @@ mod tests {
     fn test_find_leaf_by_label() {
         let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
         let label = create_test_hash(1);
-        let new_leaf = Node::new_leaf(true, true, label, create_test_hash(2), create_test_hash(3));
+        let new_leaf = Node::new_leaf(true, label, create_test_hash(2), create_test_hash(3));
         tree.nodes[0] = new_leaf.clone();
         assert_eq!(tree.find_leaf_by_label(&label), Some(new_leaf));
     }
@@ -806,7 +808,6 @@ mod tests {
         let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
         let new_leaf = Node::new_leaf(
             true,
-            true,
             create_test_hash(1),
             create_test_hash(2),
             create_test_hash(3),
@@ -821,7 +822,6 @@ mod tests {
         let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
         let mut existing_leaf = Node::new_leaf(
             true,
-            true,
             create_test_hash(1),
             create_test_hash(2),
             create_test_hash(3),
@@ -831,7 +831,6 @@ mod tests {
 
         let non_existent_leaf = Node::new_leaf(
             true,
-            true,
             create_test_hash(4),
             create_test_hash(5),
             create_test_hash(6),
@@ -840,7 +839,9 @@ mod tests {
         let proof = tree
             .generate_non_membership_proof(&non_existent_leaf)
             .unwrap();
-        assert_eq!(proof.closest_index, 1);
+
+        println!("{}", tree);
+        assert_eq!(proof.closest_index, 0);
     }
 
     #[test]
@@ -848,14 +849,12 @@ mod tests {
         let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
         let original_leaf = Node::new_leaf(
             true,
-            true,
             create_test_hash(1),
             create_test_hash(2),
             create_test_hash(3),
         );
         tree.nodes[0] = original_leaf.clone();
         let new_leaf = Node::new_leaf(
-            true,
             true,
             create_test_hash(4),
             create_test_hash(5),
@@ -871,7 +870,6 @@ mod tests {
     fn test_insert_node() {
         let mut tree = IndexedMerkleTree::new_with_size(4).unwrap();
         let mut new_leaf = Node::new_leaf(
-            true,
             true,
             create_test_hash(1),
             create_test_hash(2),
