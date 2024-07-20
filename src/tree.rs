@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::MerkleTreeError;
 use crate::node::{InnerNode, LeafNode, Node};
 use crate::{sha256_mod, Hash};
+use std::fmt;
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -148,6 +149,16 @@ pub enum Proof {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct IndexedMerkleTree {
     pub nodes: Vec<Node>,
+}
+
+impl fmt::Display for IndexedMerkleTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            self.fmt_mermaid(f)
+        } else {
+            self.fmt_tree(f)
+        }
+    }
 }
 
 impl IndexedMerkleTree {
@@ -524,6 +535,123 @@ impl IndexedMerkleTree {
             first_proof,
             second_proof,
         })
+    }
+
+    fn fmt_tree(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn write_node(
+            f: &mut fmt::Formatter<'_>,
+            node: &Node,
+            depth: usize,
+            is_last: bool,
+            prefix: &str,
+        ) -> fmt::Result {
+            let indent = if is_last { "└── " } else { "├── " };
+            let node_prefix = format!("{}{}", prefix, indent);
+
+            match node {
+                Node::Inner(inner) => {
+                    writeln!(f, "{}Inner Node (Hash: {})", node_prefix, inner.hash)?;
+                    let new_prefix = format!("{}{}   ", prefix, if is_last { " " } else { "│" });
+                    write_node(f, &inner.left, depth + 1, false, &new_prefix)?;
+                    write_node(f, &inner.right, depth + 1, true, &new_prefix)?;
+                }
+                Node::Leaf(leaf) => {
+                    writeln!(
+                        f,
+                        "{}Leaf Node (Hash: {}, Active: {}, Label: {}, Value: {}, Next: {})",
+                        node_prefix, leaf.hash, leaf.active, leaf.label, leaf.value, leaf.next
+                    )?;
+                }
+            }
+            Ok(())
+        }
+
+        writeln!(f, "Indexed Merkle Tree:")?;
+        if let Some(root) = self.nodes.last() {
+            write_node(f, root, 0, true, "")?;
+        } else {
+            writeln!(f, "(Empty Tree)")?;
+        }
+        Ok(())
+    }
+
+    fn fmt_mermaid(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "graph TD")?;
+
+        let mut node_id = 0;
+
+        fn write_node(
+            f: &mut fmt::Formatter<'_>,
+            node: &Node,
+            parent_id: Option<usize>,
+            node_id: &mut usize,
+        ) -> fmt::Result {
+            let current_id = *node_id;
+            *node_id += 1;
+
+            match node {
+                Node::Inner(inner) => {
+                    writeln!(
+                        f,
+                        "    N{current_id}[Inner {:.6}]",
+                        &inner.hash.to_string()[..8]
+                    )?;
+                    if let Some(pid) = parent_id {
+                        writeln!(f, "    N{pid} --> N{current_id}")?;
+                    }
+                    write_node(f, &inner.left, Some(current_id), node_id)?;
+                    write_node(f, &inner.right, Some(current_id), node_id)?;
+                }
+                Node::Leaf(leaf) => {
+                    writeln!(
+                        f,
+                        "    N{current_id}[Hash: n{:.6}...\\nNext: {:.6}...\\nLabel: {:.6}...\\nValue: {:.6}...\\n]",
+                        &leaf.hash.to_string()[..8], &leaf.next.to_string()[..8], &leaf.label.to_string()[..8], &leaf.value.to_string()[..8]
+                    )?;
+                    if let Some(pid) = parent_id {
+                        writeln!(f, "    N{pid} --> N{current_id}")?;
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        if let Some(root) = self.nodes.last() {
+            write_node(f, root, None, &mut node_id)?;
+        } else {
+            writeln!(f, "    N0[Empty Tree]")?;
+        }
+
+        // Add styling
+        writeln!(
+            f,
+            "    classDef inner fill:#87CEFA,stroke:#4682B4,stroke-width:2px,color:black;"
+        )?;
+        writeln!(
+            f,
+            "    classDef active fill:#98FB98,stroke:#006400,stroke-width:2px,color:black;"
+        )?;
+        writeln!(
+            f,
+            "    classDef inactive fill:#FFA07A,stroke:#8B0000,stroke-width:2px,color:black;"
+        )?;
+        writeln!(f, "    class N0 inner;")?;
+        for i in 1..node_id {
+            writeln!(
+                f,
+                "    class N{} {};",
+                i,
+                if i < self.nodes.len() / 2 {
+                    "inner"
+                } else if self.nodes[i].is_active() {
+                    "active"
+                } else {
+                    "inactive"
+                }
+            )?;
+        }
+
+        Ok(())
     }
 }
 
