@@ -1,6 +1,6 @@
 [package]
 name = "indexed-merkle-tree"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 authors = [
     "Ryan Quinn Ford <ryan@deltadevs.xyz>",
