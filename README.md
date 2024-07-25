@@ -4,6 +4,23 @@
 
 The Indexed Merkle Tree crate provides a robust implementation of indexed Merkle trees in particular described for [Transparency Dictionaries](https://eprint.iacr.org/2021/1263.pdf) that can be used for various cryptographic applications. Compared to normal Merkle trees, this implementation provides proofs for both membership and non-membership, ensuring uniqueness of leaf nodes.
 
+## Breaking Changes in Version 0.6.0
+
+Version 0.6.0 introduces significant breaking changes:
+
+- **Removal of Active Flag**: The `is_active` flag has been removed from leaf nodes. This changes how node activity is determined and affects the hash calculation of nodes.
+
+- **New Inactive Node Identification**: Inactive nodes are now identified by their `next` pointer being set to `Node::HEAD`. This replaces the previous `is_active` flag mechanism.
+
+- **Special First Node**: The first node in the tree now has a special configuration to ensure correct non-membership proofs:
+  - Label: `Node::HEAD` (0x00000...)
+  - Value: `Node::HEAD` (0x00000...)
+  - Next: `Node::TAIL` (0xFFFF...)
+
+- **Hash Calculation Change**: Due to the removal of the `is_active` flag, the hash calculation for nodes has changed. This means that trees created with previous versions will have different hash values in version 0.6.0.
+
+These changes improve the efficiency and logical consistency of the Indexed Merkle Tree implementation while maintaining its core functionality. Users upgrading to this version will need to rebuild their trees and update any code that relies on the previous activity checking mechanism.
+
 ## Breaking Changes in Version 0.5.0
 
 Version 0.5.0 introduces breaking changes:

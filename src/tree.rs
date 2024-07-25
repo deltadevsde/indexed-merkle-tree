@@ -195,8 +195,8 @@ impl IndexedMerkleTree {
         let active_node = Node::new_leaf(true, empty_hash, empty_hash, tail);
         nodes.push(active_node);
 
-        let left_inactive_node = Node::new_leaf(true, empty_hash, empty_hash, tail);
-        let right_inactive_node = Node::new_leaf(false, empty_hash, empty_hash, tail);
+        let left_inactive_node = Node::new_leaf(true, empty_hash, empty_hash, empty_hash);
+        let right_inactive_node = Node::new_leaf(false, empty_hash, empty_hash, empty_hash);
 
         let alternates = vec![left_inactive_node, right_inactive_node]
             .into_iter()
@@ -705,7 +705,7 @@ pub fn resort_nodes_by_input_order(
         .filter_map(|node| {
             let label = match &node {
                 Node::Inner(_) => None,
-                Node::Leaf(leaf) => Some(leaf.label.clone()),
+                Node::Leaf(leaf) => Some(leaf.label),
             };
 
             label.and_then(|l| {
@@ -840,8 +840,7 @@ mod tests {
             .generate_non_membership_proof(&non_existent_leaf)
             .unwrap();
 
-        println!("{}", tree);
-        assert_eq!(proof.closest_index, 0);
+        assert_eq!(proof.closest_index, 1);
     }
 
     #[test]

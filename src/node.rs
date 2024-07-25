@@ -53,7 +53,7 @@ impl InnerNode {
 /// Leaf nodes contain the actual data stored in the tree structure as well as metadata that,
 /// among other things, ensures the integrity and order of the tree structure.
 /// Each leaf node contains a hash of its metadata consisting of a SHA256 value,
-/// an active flag that indicates whether the leaf is active or not and links to neighboring elements for efficient traversal and verification.
+/// a link to neighboring elements for efficient traversal and verification.
 /// The links lead to the label field which is also a SHA256 value, making it sortable, which is crucial for e.g. Non-Membership proofs.
 /// For more information see https://eprint.iacr.org/2021/1263.pdf.
 ///
@@ -76,7 +76,7 @@ impl LeafNode {
     /// Initializes a new leaf node with the specified properties.
     ///
     /// This function creates a leaf node with above defined attributes. The hash is generated based on
-    /// its active status, label, value, and next pointer. Additionally, the node is marked as a left sibling or not.
+    /// its label, value, and next pointer. Additionally, the node is marked as a left sibling or not.
     ///
     /// # Arguments
     /// * `is_left` - Boolean indicating if this is a left sibling.
@@ -98,13 +98,13 @@ impl LeafNode {
     }
 
     pub fn is_active(&self) -> bool {
-        self.value != Node::HEAD
+        self.next != Node::HEAD
     }
 }
 
 impl Default for LeafNode {
     fn default() -> Self {
-        LeafNode::new(false, Node::HEAD, Node::HEAD, Node::TAIL)
+        LeafNode::new(false, Node::HEAD, Node::HEAD, Node::HEAD)
     }
 }
 
@@ -301,8 +301,8 @@ impl Node {
     /// This function computes the hash of a node based on its type and properties.
     /// For an inner node, the hash is generated from the concatenated hashes of its left and right children in form of:
     ///     SHA256(left_child_hash || right_child_hash)
-    /// For a leaf node, the hash is based on its active status, label, value, and the reference to the next node in the tree:
-    ///     SHA256(active || label || value || next)
+    /// For a leaf node, the hash is based on its label, value, and the reference to the next node in the tree:
+    ///     SHA256(label || value || next)
     pub fn generate_hash(&mut self) {
         match self {
             Node::Inner(node) => {
@@ -317,14 +317,7 @@ impl Node {
             }
             Node::Leaf(leaf) => {
                 let hash = sha256_mod(
-                    &[
-                        // Question to reviewer: Does the active value really need to be part of the hash?
-                        &[leaf.is_active() as u8],
-                        leaf.label.as_ref(),
-                        leaf.value.as_ref(),
-                        leaf.next.as_ref(),
-                    ]
-                    .concat(),
+                    &[leaf.label.as_ref(), leaf.value.as_ref(), leaf.next.as_ref()].concat(),
                 );
                 leaf.hash = hash;
             }
@@ -383,7 +376,7 @@ mod tests {
             Hash::new([2; 32]),
             Hash::new([3; 32]),
         );
-        let inactive_leaf = Node::new_leaf(true, Node::HEAD, Node::HEAD, Node::TAIL);
+        let inactive_leaf = Node::new_leaf(true, Node::HEAD, Node::HEAD, Node::HEAD);
         let inner_node = Node::new_inner(active_leaf.clone(), inactive_leaf.clone(), 0);
 
         assert!(active_leaf.is_active());
