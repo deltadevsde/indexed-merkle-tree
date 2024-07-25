@@ -2,12 +2,15 @@ pub mod error;
 pub mod node;
 pub mod tree;
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use num::BigUint;
 use num_traits::Num;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Serialize, Deserialize, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, PartialEq, Eq,
+)]
 pub struct Hash([u8; 32]);
 
 impl Hash {
