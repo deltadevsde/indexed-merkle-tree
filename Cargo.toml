@@ -19,7 +19,6 @@ num = "0.4.0"
 serde = { version = "1.0.151", features = ["derive", "rc"] }
 thiserror = "1.0.50"
 serde_json = "1.0.79"
-cargo-audit = "0.20.0"
 sha2 = "0.10.8"
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
