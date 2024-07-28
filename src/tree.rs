@@ -1,11 +1,15 @@
-use num::BigInt;
+extern crate alloc;
+
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use num_bigint::BigInt;
 use num_bigint::Sign;
 use serde::{Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
 use crate::node::{InnerNode, LeafNode, Node};
 use crate::{sha256_mod, Hash};
-use std::fmt;
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -151,6 +155,7 @@ pub struct IndexedMerkleTree {
     pub nodes: Vec<Node>,
 }
 
+#[cfg(feature = "std")]
 impl fmt::Display for IndexedMerkleTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
@@ -359,7 +364,7 @@ impl IndexedMerkleTree {
             return Err(MerkleTreeError::IndexError(index.to_string()));
         }
 
-        let mut proof_path: Vec<Node> = vec![];
+        let mut proof_path: Vec<Node> = Vec::new();
         let mut current_index = index;
 
         let leaf_node = self.nodes[current_index].clone();
@@ -537,6 +542,7 @@ impl IndexedMerkleTree {
         })
     }
 
+    #[cfg(feature = "std")]
     fn fmt_tree(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fn write_node(
             f: &mut fmt::Formatter<'_>,
@@ -580,6 +586,7 @@ impl IndexedMerkleTree {
         Ok(())
     }
 
+    #[cfg(feature = "std")]
     fn fmt_mermaid(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "graph TD")?;
 
