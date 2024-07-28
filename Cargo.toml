@@ -14,13 +14,14 @@ keywords = ["crypto", "merkle-tree", "membership", "non-membership"]
 readme = "README.md"
 
 [features]
-default = []
+default = ["std"]
 std = [
     "serde/std", 
     "num/std",
     "num-bigint/std", 
     "num-traits/std", 
     "borsh/std",
+    "hex/std",
 ]
 
 [dependencies]

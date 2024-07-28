@@ -1,5 +1,3 @@
-#![no_std]
-
 extern crate alloc;
 
 pub mod error;
@@ -54,9 +52,9 @@ impl AsRef<[u8]> for Hash {
 }
 
 #[cfg(feature = "std")]
-impl fmt::Display for Hash {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.to_hex())
+impl std::fmt::Display for Hash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
     }
 }
 

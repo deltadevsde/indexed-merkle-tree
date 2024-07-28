@@ -156,8 +156,8 @@ pub struct IndexedMerkleTree {
 }
 
 #[cfg(feature = "std")]
-impl fmt::Display for IndexedMerkleTree {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for IndexedMerkleTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
             self.fmt_mermaid(f)
         } else {
@@ -543,14 +543,14 @@ impl IndexedMerkleTree {
     }
 
     #[cfg(feature = "std")]
-    fn fmt_tree(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt_tree(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fn write_node(
-            f: &mut fmt::Formatter<'_>,
+            f: &mut std::fmt::Formatter<'_>,
             node: &Node,
             depth: usize,
             is_last: bool,
             prefix: &str,
-        ) -> fmt::Result {
+        ) -> std::fmt::Result {
             let indent = if is_last { "└── " } else { "├── " };
             let node_prefix = format!("{}{}", prefix, indent);
 
@@ -587,17 +587,17 @@ impl IndexedMerkleTree {
     }
 
     #[cfg(feature = "std")]
-    fn fmt_mermaid(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt_mermaid(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "graph TD")?;
 
         let mut node_id = 0;
 
         fn write_node(
-            f: &mut fmt::Formatter<'_>,
+            f: &mut std::fmt::Formatter<'_>,
             node: &Node,
             parent_id: Option<usize>,
             node_id: &mut usize,
-        ) -> fmt::Result {
+        ) -> std::fmt::Result {
             let current_id = *node_id;
             *node_id += 1;
 
