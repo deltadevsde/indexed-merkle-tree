@@ -1,6 +1,6 @@
 [package]
 name = "indexed-merkle-tree"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 authors = [
     "Ryan Quinn Ford <ryan@deltadevs.xyz>",
@@ -11,19 +11,30 @@ homepage = "https://github.com/deltadevsde/indexed-merkle-tree"
 repository = "https://github.com/deltadevsde/indexed-merkle-tree"
 license = "MIT"
 keywords = ["crypto", "merkle-tree", "membership", "non-membership"]
+categories = ["no-std"]
 readme = "README.md"
 
+[features]
+default = ["std"]
+std = [
+    "serde/std", 
+    "num/std",
+    "num-bigint/std", 
+    "num-traits/std", 
+    "borsh/std",
+    "hex/std",
+]
+
 [dependencies]
-borsh = { version = "1.5.1", features = ["derive"] }
-num = "0.4.0"
-serde = { version = "1.0.151", features = ["derive", "rc"] }
-thiserror = "1.0.50"
-serde_json = "1.0.79"
-cargo-audit = "0.20.0"
-sha2 = "0.10.8"
-num-bigint = "0.4.6"
-num-traits = "0.2.19"
-hex = "0.4.3"
+borsh = { version = "1.5.1", features = ["derive"], default-features = false }
+num = { version = "0.4.0", default-features = false }
+serde = { version = "1.0.151", features = ["derive", "rc"], default-features = false }
+anyhow = { version = "1.0.44", default-features = false }
+serde_json = { version = "1.0.79", optional = true }
+sha2 = { version = "0.10.8", default-features = false }
+num-bigint = { version = "0.4.6", default-features = false }
+num-traits = { version = "0.2.19", default-features = false }
+hex = { version = "0.4.3", default-features = false }
 
 [dev-dependencies]
 criterion = "0.3"

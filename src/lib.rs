@@ -1,9 +1,14 @@
+extern crate alloc;
+
 pub mod error;
 pub mod node;
 pub mod tree;
 
+use alloc::string::ToString;
+use anyhow::Result;
 use borsh::{BorshDeserialize, BorshSerialize};
-use num::BigUint;
+use error::MerkleTreeError;
+use num_bigint::BigUint;
 use num_traits::Num;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -18,18 +23,25 @@ impl Hash {
         Hash(bytes)
     }
 
-    pub fn from_hex(hex: &str) -> Result<Self, hex::FromHexError> {
-        let bytes = hex::decode(hex)?;
-        if bytes.len() != 32 {
-            return Err(hex::FromHexError::InvalidStringLength);
-        }
-        let mut array = [0u8; 32];
-        array.copy_from_slice(&bytes);
-        Ok(Hash(array))
+    pub fn from_hex(hex_str: &str) -> Result<Self, MerkleTreeError> {
+        let mut bytes = [0u8; 32];
+        hex::decode_to_slice(hex_str, &mut bytes)
+            .map_err(|e| MerkleTreeError::InvalidFormatError(e.to_string()))?;
+        Ok(Hash(bytes))
     }
 
+    #[cfg(feature = "std")]
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
+    }
+
+    #[cfg(not(feature = "std"))]
+    pub fn to_hex(&self) -> [u8; 64] {
+        // This is correct, as 32 bytes become 64 hex characters
+        let mut hex = [0u8; 64];
+        hex::encode_to_slice(self.0, &mut hex)
+            .expect("The output is exactly twice the size of the input");
+        hex
     }
 }
 
@@ -39,6 +51,7 @@ impl AsRef<[u8]> for Hash {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::fmt::Display for Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_hex())
@@ -83,7 +96,7 @@ pub fn sha256_mod(input: &[u8]) -> Hash {
     let modded_hash = hash_bigint % modulus;
     let mut bytes = modded_hash.to_bytes_be();
     if bytes.len() < 32 {
-        bytes = std::iter::repeat(0)
+        bytes = core::iter::repeat(0)
             .take(32 - bytes.len())
             .chain(bytes)
             .collect();

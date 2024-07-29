@@ -4,6 +4,15 @@
 
 The Indexed Merkle Tree crate provides a robust implementation of indexed Merkle trees in particular described for [Transparency Dictionaries](https://eprint.iacr.org/2021/1263.pdf) that can be used for various cryptographic applications. Compared to normal Merkle trees, this implementation provides proofs for both membership and non-membership, ensuring uniqueness of leaf nodes.
 
+## Changes in Version 0.6.1
+
+Version 0.6.1 introduces `no_std` support, allowing the crate to be used in environments without the standard library. To enable this, simply disable the default features in your `Cargo.toml`:
+
+```toml
+[dependencies]
+indexed_merkle_tree = { version = "0.6.1", default-features = false }
+```
+
 ## Breaking Changes in Version 0.6.0
 
 Version 0.6.0 introduces significant breaking changes:

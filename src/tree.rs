@@ -1,11 +1,15 @@
-use num::BigInt;
+extern crate alloc;
+
+use alloc::string::ToString;
+use alloc::vec;
+use alloc::vec::Vec;
+use num_bigint::BigInt;
 use num_bigint::Sign;
 use serde::{Deserialize, Serialize};
 
 use crate::error::MerkleTreeError;
 use crate::node::{InnerNode, LeafNode, Node};
 use crate::{sha256_mod, Hash};
-use std::fmt;
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -151,8 +155,9 @@ pub struct IndexedMerkleTree {
     pub nodes: Vec<Node>,
 }
 
-impl fmt::Display for IndexedMerkleTree {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+#[cfg(feature = "std")]
+impl std::fmt::Display for IndexedMerkleTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
             self.fmt_mermaid(f)
         } else {
@@ -359,7 +364,7 @@ impl IndexedMerkleTree {
             return Err(MerkleTreeError::IndexError(index.to_string()));
         }
 
-        let mut proof_path: Vec<Node> = vec![];
+        let mut proof_path: Vec<Node> = Vec::new();
         let mut current_index = index;
 
         let leaf_node = self.nodes[current_index].clone();
@@ -537,14 +542,15 @@ impl IndexedMerkleTree {
         })
     }
 
-    fn fmt_tree(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    #[cfg(feature = "std")]
+    fn fmt_tree(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fn write_node(
-            f: &mut fmt::Formatter<'_>,
+            f: &mut std::fmt::Formatter<'_>,
             node: &Node,
             depth: usize,
             is_last: bool,
             prefix: &str,
-        ) -> fmt::Result {
+        ) -> std::fmt::Result {
             let indent = if is_last { "└── " } else { "├── " };
             let node_prefix = format!("{}{}", prefix, indent);
 
@@ -580,17 +586,18 @@ impl IndexedMerkleTree {
         Ok(())
     }
 
-    fn fmt_mermaid(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    #[cfg(feature = "std")]
+    fn fmt_mermaid(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "graph TD")?;
 
         let mut node_id = 0;
 
         fn write_node(
-            f: &mut fmt::Formatter<'_>,
+            f: &mut std::fmt::Formatter<'_>,
             node: &Node,
             parent_id: Option<usize>,
             node_id: &mut usize,
-        ) -> fmt::Result {
+        ) -> std::fmt::Result {
             let current_id = *node_id;
             *node_id += 1;
 
