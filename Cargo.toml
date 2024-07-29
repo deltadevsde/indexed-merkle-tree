@@ -1,6 +1,6 @@
 [package]
 name = "indexed-merkle-tree"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 authors = [
     "Ryan Quinn Ford <ryan@deltadevs.xyz>",
@@ -11,6 +11,7 @@ homepage = "https://github.com/deltadevsde/indexed-merkle-tree"
 repository = "https://github.com/deltadevsde/indexed-merkle-tree"
 license = "MIT"
 keywords = ["crypto", "merkle-tree", "membership", "non-membership"]
+categories = ["no-std"]
 readme = "README.md"
 
 [features]
