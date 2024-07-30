@@ -216,8 +216,7 @@ impl IndexedMerkleTree {
     ///
     /// When called, this function expects the passed nodes to be leaf nodes.
     /// It assumes these are the only nodes present in `self.nodes`.
-    #[allow(clippy::unnecessary_to_owned)]
-    fn rehash_inner_nodes(&mut self, current_layer: &[Node]) {
+    fn rehash_inner_nodes(&mut self, current_layer: Vec<Node>) {
         for (index, node) in current_layer.chunks(2).enumerate() {
             let new_node = Node::Inner(InnerNode::new(node[0].clone(), node[1].clone(), index));
             self.nodes.push(new_node);
@@ -225,7 +224,7 @@ impl IndexedMerkleTree {
 
         let remaining = current_layer.len() / 2;
         if remaining > 1 {
-            self.rehash_inner_nodes(&self.nodes[self.nodes.len() - remaining..].to_vec());
+            self.rehash_inner_nodes(self.nodes[self.nodes.len() - remaining..].to_vec());
         }
     }
 
@@ -234,7 +233,7 @@ impl IndexedMerkleTree {
     /// This is done when first initializing the tree, as well as when nodes are updated.
     fn rebuild_tree_from_leaves(&mut self) {
         self.nodes.retain(|node| matches!(node, Node::Leaf(_)));
-        self.rehash_inner_nodes(&self.nodes.clone());
+        self.rehash_inner_nodes(self.nodes.clone());
     }
 
     /// Calculates the root of an IndexedMerkleTree by aggregating the tree's nodes.
@@ -544,12 +543,11 @@ impl IndexedMerkleTree {
     }
 
     #[cfg(feature = "std")]
-    #[allow(clippy::only_used_in_recursion)]
     fn fmt_tree(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fn write_node(
             f: &mut std::fmt::Formatter<'_>,
             node: &Node,
-            depth: usize,
+            _depth: usize,
             is_last: bool,
             prefix: &str,
         ) -> std::fmt::Result {
@@ -560,8 +558,8 @@ impl IndexedMerkleTree {
                 Node::Inner(inner) => {
                     writeln!(f, "{}Inner Node (Hash: {})", node_prefix, inner.hash)?;
                     let new_prefix = format!("{}{}   ", prefix, if is_last { " " } else { "│" });
-                    write_node(f, &inner.left, depth + 1, false, &new_prefix)?;
-                    write_node(f, &inner.right, depth + 1, true, &new_prefix)?;
+                    write_node(f, &inner.left, _depth + 1, false, &new_prefix)?;
+                    write_node(f, &inner.right, _depth + 1, true, &new_prefix)?;
                 }
                 Node::Leaf(leaf) => {
                     writeln!(
