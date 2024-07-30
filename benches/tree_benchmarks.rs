@@ -63,7 +63,7 @@ fn bench_non_membership_proof(c: &mut Criterion) {
         group.bench_with_input(format!("size_{}", size), &size, |b, &size| {
             // Setup: Create the tree and insert nodes once
             let mut tree = IndexedMerkleTree::new_with_size(size).unwrap();
-            for i in 0..size / 2 {
+            for _ in 0..size / 2 {
                 let mut node = Node::new_leaf(
                     true,
                     create_random_test_hash(),
