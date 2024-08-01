@@ -5,28 +5,62 @@ pub mod node;
 pub mod tree;
 
 use alloc::string::ToString;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use borsh::{BorshDeserialize, BorshSerialize};
-use error::MerkleTreeError;
+use error::{MerkleTreeError, MerkleTreeResult};
 use num_bigint::BigUint;
 use num_traits::Num;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+#[cfg(feature = "bls")]
+use bls12_381::Scalar;
 
 #[derive(
     Serialize, Deserialize, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, PartialEq, Eq,
 )]
 pub struct Hash([u8; 32]);
 
+#[cfg(feature = "bls")]
+impl TryFrom<Hash> for Scalar {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Hash) -> Result<Scalar, Self::Error> {
+        let mut byte_array = [0u8; 32];
+        byte_array.copy_from_slice(value.as_ref());
+        byte_array.reverse();
+
+        let val =
+            [
+                u64::from_le_bytes(
+                    byte_array[0..8].try_into().map_err(|_| {
+                        anyhow!(format!("slice to array: [0..8] for hash: {value:?}"))
+                    })?,
+                ),
+                u64::from_le_bytes(byte_array[8..16].try_into().map_err(|_| {
+                    anyhow!(format!("slice to array: [8..16] for hash: {value:?}"))
+                })?),
+                u64::from_le_bytes(byte_array[16..24].try_into().map_err(|_| {
+                    anyhow!(format!("slice to array: [16..24] for hash: {value:?}"))
+                })?),
+                u64::from_le_bytes(byte_array[24..32].try_into().map_err(|_| {
+                    anyhow!(format!("slice to array: [24..42] for hash: {value:?}"))
+                })?),
+            ];
+
+        Ok(Scalar::from_raw(val))
+    }
+}
+
 impl Hash {
     pub const fn new(bytes: [u8; 32]) -> Self {
         Hash(bytes)
     }
 
-    pub fn from_hex(hex_str: &str) -> Result<Self, MerkleTreeError> {
+    pub fn from_hex(hex_str: &str) -> MerkleTreeResult<Self> {
         let mut bytes = [0u8; 32];
         hex::decode_to_slice(hex_str, &mut bytes)
-            .map_err(|e| MerkleTreeError::InvalidFormatError(e.to_string()))?;
+            .map_err(|e| anyhow!(MerkleTreeError::InvalidFormatError(e.to_string())))?;
         Ok(Hash(bytes))
     }
 

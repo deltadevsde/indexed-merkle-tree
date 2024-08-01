@@ -7,9 +7,10 @@ use num_bigint::BigInt;
 use num_bigint::Sign;
 use serde::{Deserialize, Serialize};
 
-use crate::error::MerkleTreeError;
+use crate::error::{MerkleTreeError, MerkleTreeResult};
 use crate::node::{InnerNode, LeafNode, Node};
 use crate::{sha256_mod, Hash};
+use anyhow::anyhow;
 
 // `MerkleProof` contains the root hash and a `Vec<Node>>` following the path from the leaf to the root.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -173,8 +174,8 @@ impl IndexedMerkleTree {
     /// * `nodes` - A vector of `Node` elements from which the Merkle tree will be built.
     ///
     /// # Returns
-    /// A `Result<Self, MerkleTreeError>` representing the initialized tree or an error.
-    pub fn new(nodes: Vec<Node>) -> Result<Self, MerkleTreeError> {
+    /// A `MerkleTreeResult<Self>` representing the initialized tree or an error.
+    pub fn new(nodes: Vec<Node>) -> MerkleTreeResult<Self> {
         // TODO(@distractedm1nd): Issue #3
         let parsed_nodes = set_left_sibling_status_for_nodes(nodes);
 
@@ -191,8 +192,8 @@ impl IndexedMerkleTree {
     /// * `size` - The number of nodes in the tree.
     ///
     /// # Returns
-    /// A `Result<Self, MerkleTreeError>` representing the initialized tree or an error.
-    pub fn new_with_size(size: usize) -> Result<Self, MerkleTreeError> {
+    /// A `MerkleTreeResult<Self>` representing the initialized tree or an error.
+    pub fn new_with_size(size: usize) -> MerkleTreeResult<Self> {
         let mut nodes: Vec<Node> = Vec::with_capacity(2 * size + 1);
         let empty_hash = Node::HEAD;
         let tail = Node::TAIL;
@@ -250,7 +251,7 @@ impl IndexedMerkleTree {
     /// # Returns
     ///
     /// * `Result<(), MerkleTreeError>` - A result indicating the success or failure of the operation.
-    fn calculate_root(&mut self) -> Result<(), MerkleTreeError> {
+    fn calculate_root(&mut self) -> MerkleTreeResult<()> {
         // self.rebuild_tree_from_leaves();
         self.rebuild_tree_from_leaves();
 
@@ -258,7 +259,7 @@ impl IndexedMerkleTree {
         let root = self
             .nodes
             .last_mut()
-            .ok_or(MerkleTreeError::EmptyMerkleTreeError)?; // TODO: are there possible other Errors? is it possible at all to have an empty tree at this point?
+            .ok_or(anyhow!(MerkleTreeError::EmptyMerkleTreeError))?; // TODO: are there possible other Errors? is it possible at all to have an empty tree at this point?
         root.set_left_sibling_value(false);
 
         Ok(())
@@ -267,16 +268,16 @@ impl IndexedMerkleTree {
     /// # Returns
     ///
     /// The current root node of the Indexed Merkle tree.
-    pub fn get_root(&self) -> Result<&Node, MerkleTreeError> {
+    pub fn get_root(&self) -> MerkleTreeResult<&Node> {
         self.nodes
             .last()
-            .ok_or(MerkleTreeError::EmptyMerkleTreeError)
+            .ok_or(anyhow!(MerkleTreeError::EmptyMerkleTreeError))
     }
 
     /// # Returns
     ///
     /// The current commitment (hash of the root node) of the Indexed Merkle tree.
-    pub fn get_commitment(&self) -> Result<Hash, MerkleTreeError> {
+    pub fn get_commitment(&self) -> MerkleTreeResult<Hash> {
         Ok(self.get_root()?.get_hash())
     }
 
@@ -358,10 +359,10 @@ impl IndexedMerkleTree {
     ///
     /// # Returns
     /// A `Result<MerkleProof, MerkleTreeError>` containing the membership proof or an error.
-    pub fn generate_membership_proof(&self, index: usize) -> Result<MerkleProof, MerkleTreeError> {
+    pub fn generate_membership_proof(&self, index: usize) -> MerkleTreeResult<MerkleProof> {
         // if the index is outside of the valid range of the tree, there is no proof
         if index >= self.nodes.len() {
-            return Err(MerkleTreeError::IndexError(index.to_string()));
+            return Err(anyhow!(MerkleTreeError::IndexError(index.to_string())));
         }
 
         let mut proof_path: Vec<Node> = Vec::new();
@@ -402,15 +403,15 @@ impl IndexedMerkleTree {
     /// * `node` - A reference to the `Node` for which the non-membership proof is required.
     ///
     /// # Returns
-    /// A `Result<NonMembershipProof, MerkleTreeError>` containing the non-membership proof and
+    /// A `MerkleTreeResult<NonMembershipProof>` containing the non-membership proof and
     /// the index of the "closest" valid node, or an error.
     pub fn generate_non_membership_proof(
         &self,
         node: &Node,
-    ) -> Result<NonMembershipProof, MerkleTreeError> {
+    ) -> MerkleTreeResult<NonMembershipProof> {
         let given_node_as_leaf = match node {
             Node::Leaf(leaf) => leaf,
-            _ => return Err(MerkleTreeError::NotFoundError("Leaf".to_string())),
+            _ => return Err(anyhow!(MerkleTreeError::NotFoundError("Leaf".to_string()))),
         };
 
         let mut found_index = None;
@@ -434,7 +435,7 @@ impl IndexedMerkleTree {
                 closest_index: found_index.unwrap(),
                 missing_node: given_node_as_leaf.clone(),
             }),
-            None => Err(MerkleTreeError::MerkleProofError),
+            None => Err(anyhow!(MerkleTreeError::MerkleProofError)),
         }
     }
 
@@ -449,12 +450,8 @@ impl IndexedMerkleTree {
     /// * `new_node` - The new state of the node.
     ///
     /// # Returns
-    /// A `Result<UpdateProof, MerkleTreeError>` containing the the old root, the old proof, the new root and the new proof.
-    pub fn update_node(
-        &mut self,
-        index: usize,
-        new_node: Node,
-    ) -> Result<UpdateProof, MerkleTreeError> {
+    /// A `MerkleTreeResult<UpdateProof, MerkleTreeError>` containing the the old root, the old proof, the new root and the new proof.
+    pub fn update_node(&mut self, index: usize, new_node: Node) -> MerkleTreeResult<UpdateProof> {
         // generate old proof
         let old_proof = self.generate_membership_proof(index)?;
 
@@ -484,13 +481,13 @@ impl IndexedMerkleTree {
     /// * `new_node` - The new node to be inserted.
     ///
     /// # Returns
-    /// A `Result<(MerkleProof, UpdateProof, UpdateProof), MerkleTreeError>` containing the non-membership proof and two update proofs.
-    pub fn insert_node(&mut self, new_node: &mut Node) -> Result<InsertProof, MerkleTreeError> {
+    /// A `MerkleTreeResult<InsertProof>` containing the non-membership proof and two update proofs.
+    pub fn insert_node(&mut self, new_node: &mut Node) -> MerkleTreeResult<InsertProof> {
         // perform non-membership check in order to return the index of the node to be changed
         let non_membership_proof = self.generate_non_membership_proof(new_node)?;
 
         if non_membership_proof.merkle_proof.path.first().is_none() {
-            return Err(MerkleTreeError::MerkleProofError);
+            return Err(anyhow!(MerkleTreeError::MerkleProofError));
         }
 
         // generate first update proof, changing only the next pointer from the old node
@@ -701,12 +698,11 @@ pub fn set_left_sibling_status_for_nodes(nodes: Vec<Node>) -> Vec<Node> {
 /// * `input_order` - A vector of strings representing the desired order of leaf labels.
 ///
 /// # Returns
-/// A `Result<Vec<Node>, MerkleTreeError>` representing the sorted nodes or an error.
-
+/// A `MerkleTreeResult<Vec<Node>>` representing the sorted nodes or an error.
 pub fn resort_nodes_by_input_order(
     nodes: Vec<Node>,
     input_order: Vec<Hash>,
-) -> Result<Vec<Node>, MerkleTreeError> {
+) -> MerkleTreeResult<Vec<Node>> {
     let valid_nodes: Vec<_> = nodes
         .into_iter()
         .filter_map(|node| {
